@@ -80,14 +80,14 @@ export const runFullScan = action({
     try {
       // 2. Run AI vision analysis
       console.log("[AHAR X] Calling analyzeImages...");
-      const aiResult: AiResult = await ctx.runAction(
+      const aiResult = (await ctx.runAction(
         api.analyzeLabel.analyzeImages,
         {
           frontImageUrl: args.frontImageUrl,
           backImageUrl: args.backImageUrl,
           scanSessionId: args.scanSessionId,
         },
-      );
+      )) as AiResult;
 
       const front: AiResult["frontAnalysis"] = aiResult.frontAnalysis;
       const back: AiResult["backAnalysis"] = aiResult.backAnalysis;

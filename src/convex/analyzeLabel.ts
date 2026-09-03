@@ -3,28 +3,9 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 
-// VLY Integration Gateway — OpenAI-compatible endpoint
 const VLY_GATEWAY_URL = "https://integrations.vly.ai/v1/llm/chat/completions";
 
-// AI vision analysis of food package images
-export const analyzeImages = action({
-  args: {
-    frontImageUrl: v.string(),
-    backImageUrl: v.string(),
-    scanSessionId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const apiKey = process.env.VLY_INTEGRATION_KEY;
-
-    if (!apiKey) {
-      throw new Error(
-        "AI analysis service is not configured. " +
-          "VLY_INTEGRATION_KEY is not set in the Convex backend environment variables. " +
-          "Please configure it in the Convex dashboard under Settings > Environment Variables.",
-      );
-    }
-
-    const prompt = `You are an expert food-label analyst specializing in Indian FSSAI regulations.
+const EXTRACTION_PROMPT = `You are an expert food-label analyst specializing in Indian FSSAI regulations.
 
 Analyze BOTH images of this food package (FRONT and BACK) and extract ALL readable information.
 
@@ -36,26 +17,24 @@ CRITICAL RULES:
 - For ingredients, extract the FULL list exactly as printed, preserving order.
 - For each ingredient that has a percentage visible, extract the exact percentage string as printed.
 - Look for vegetarian/non-vegetarian symbol (green dot = veg, brown/red dot = non-veg).
-- Extract ALL allergen declarations (e.g., "Contains: Milk, Soy", "May contain traces of nuts").
-- Extract ALL qualifying statements (e.g., "Approximately", "May contain", "Best before").
-- Extract ALL footnotes and disclaimers visible on the back label.
-- For front-of-pack claims, detect terms like: High Protein, Low Sugar, Sugar Free, No Added Sugar, Low Fat, Fat Free, High Fibre, Source of Protein, Natural, Pure, Made With, Contains, and any ingredient prominently highlighted (e.g., "HAZELNUT", "ALMOND", "SAFFRON").
+- Extract ALL allergen declarations.
+- For front-of-pack claims, detect terms like: High Protein, Low Sugar, Sugar Free, No Added Sugar, Low Fat, Fat Free, High Fibre, Natural, Pure, Made With, Contains, and any ingredient prominently highlighted (e.g. "HAZELNUT", "ALMOND").
 
 Return a JSON object with this EXACT structure:
 
 {
   "frontAnalysis": {
-    "productName": "string or null — brand/product name if visible",
-    "claims": ["list of all front-of-pack claims visible, e.g. 'Made with Saffron', 'Sugar Free', '100% Natural'"],
-    "highlightedIngredients": ["ingredients prominently mentioned/highlighted on front, e.g. 'Hazelnut', 'Almond', 'Saffron'"],
-    "allergens": ["any allergen warnings visible on front"],
-    "otherText": ["any other notable text on front"],
-    "vegetarianSymbol": "string or null — 'vegetarian' or 'non-vegetarian' if dot symbol visible, null if not visible"
+    "productName": "string or null",
+    "claims": ["all front-of-pack claims visible"],
+    "highlightedIngredients": ["ingredients prominently highlighted on front"],
+    "allergens": ["allergen warnings on front"],
+    "otherText": ["other notable text on front"],
+    "vegetarianSymbol": "string or null"
   },
   "backAnalysis": {
-    "ingredientsList": "full raw ingredient list text as printed",
-    "ingredients": ["individual ingredient names in order as listed"],
-    "ingredientPercentages": {"ingredientName": "percentage as printed, e.g. '5.2%' or '0.1%'"},
+    "ingredientsList": "full raw ingredient list text",
+    "ingredients": ["individual ingredient names in order"],
+    "ingredientPercentages": {"ingredientName": "percentage as printed"},
     "nutritionPerServing": {
       "servingSize": "string or null",
       "calories": number or null,
@@ -69,7 +48,7 @@ Return a JSON object with this EXACT structure:
       "sodium": number or null
     },
     "allergens": ["allergen declarations from back label"],
-    "qualifiers": ["qualifying statements like 'approximately', 'may contain traces of'"],
+    "qualifiers": ["qualifying statements"],
     "footnotes": ["footnotes and disclaimers"],
     "regulatoryInfo": {
       "fssaiLicenseNumber": "string or null",
@@ -81,80 +60,159 @@ Return a JSON object with this EXACT structure:
   "extractionConfidence": {
     "frontOverall": "HIGH | MEDIUM | LOW",
     "backOverall": "HIGH | MEDIUM | LOW",
-    "frontNotes": "string — brief note about front image quality if relevant",
-    "backNotes": "string — brief note about back image quality if relevant"
+    "frontNotes": "brief note about front image quality",
+    "backNotes": "brief note about back image quality"
   }
 }
 
-Respond with ONLY the JSON object. No markdown formatting, no explanation.`;
+Respond with ONLY the JSON object. No markdown, no explanation.`;
 
-    // Build multimodal messages with base64 data URL images
-    const messages = [
-      {
-        role: "user" as const,
-        content: [
-          { type: "text" as const, text: prompt },
+function parseAiResponse(raw: string): Record<string, unknown> {
+  const cleaned = raw.replace(/```json\n?|\n?```/g, "").trim();
+  return JSON.parse(cleaned);
+}
+
+export const analyzeImages = action({
+  args: {
+    frontImageUrl: v.string(),
+    backImageUrl: v.string(),
+    scanSessionId: v.string(),
+  },
+  handler: async (_ctx, args) => {
+    const apiKey = process.env.VLY_INTEGRATION_KEY;
+
+    if (!apiKey) {
+      throw new Error(
+        "AI analysis service is not configured. VLY_INTEGRATION_KEY is missing.",
+      );
+    }
+
+    // ── Attempt 1: AI SDK generateText (correct multimodal format) ──
+    try {
+      const ai = await import("ai");
+      const openaiCompatible = await import("@ai-sdk/openai-compatible");
+
+      const provider = openaiCompatible.createOpenAICompatible({
+        name: "vly-gateway",
+        baseURL: "https://integrations.vly.ai/v1/llm",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+
+      const model = provider("gpt-4o");
+
+      const result = await ai.generateText({
+        model,
+        messages: [
           {
-            type: "image_url" as const,
-            image_url: {
-              url: args.frontImageUrl,
-              detail: "high" as const,
-            },
-          },
-          {
-            type: "image_url" as const,
-            image_url: {
-              url: args.backImageUrl,
-              detail: "high" as const,
-            },
+            role: "user",
+            content: [
+              { type: "text" as const, text: EXTRACTION_PROMPT },
+              { type: "image" as const, image: args.frontImageUrl },
+              { type: "image" as const, image: args.backImageUrl },
+            ],
           },
         ],
-      },
-    ];
-
-    const response = await fetch(VLY_GATEWAY_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        max_tokens: 4000,
         temperature: 0.1,
-        messages,
-      }),
-    });
+        maxOutputTokens: 4000,
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `AI analysis service error (${response.status}): ${errorText.slice(0, 300)}`,
-      );
+      const parsed = parseAiResponse(result.text);
+      if (parsed.frontAnalysis && parsed.backAnalysis) {
+        return {
+          frontAnalysis: parsed.frontAnalysis,
+          backAnalysis: parsed.backAnalysis,
+          extractionConfidence: parsed.extractionConfidence,
+        };
+      }
+    } catch (e: unknown) {
+      console.error("[AHAR X] AI SDK attempt failed:", e instanceof Error ? e.message : String(e));
     }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error(
-        "AI analysis service returned no content. The images may be too large or unreadable.",
-      );
-    }
-
-    // Parse the JSON response from the AI
+    // ── Attempt 2: Raw fetch with OpenAI multimodal format ──
     try {
-      const cleaned = content.replace(/```json\n?|\n?```/g, "").trim();
-      const parsed = JSON.parse(cleaned);
-      return {
-        frontAnalysis: parsed.frontAnalysis,
-        backAnalysis: parsed.backAnalysis,
-        extractionConfidence: parsed.extractionConfidence,
-      };
-    } catch {
-      throw new Error(
-        `Failed to parse AI response as structured data. The AI may have returned an unexpected format. Raw content: ${content.slice(0, 500)}`,
-      );
+      const resp = await fetch(VLY_GATEWAY_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          max_tokens: 4000,
+          temperature: 0.1,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: EXTRACTION_PROMPT },
+                { type: "image_url", image_url: { url: args.frontImageUrl, detail: "high" } },
+                { type: "image_url", image_url: { url: args.backImageUrl, detail: "high" } },
+              ],
+            },
+          ],
+        }),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          const parsed = parseAiResponse(content);
+          if (parsed.frontAnalysis && parsed.backAnalysis) {
+            return {
+              frontAnalysis: parsed.frontAnalysis,
+              backAnalysis: parsed.backAnalysis,
+              extractionConfidence: parsed.extractionConfidence,
+            };
+          }
+        }
+      } else {
+        const errBody = await resp.text();
+        console.error("[AHAR X] Raw fetch failed:", resp.status, errBody.slice(0, 300));
+      }
+    } catch (e: unknown) {
+      console.error("[AHAR X] Raw fetch attempt failed:", e instanceof Error ? e.message : String(e));
     }
+
+    // ── Attempt 3: Text-only via AI SDK (degraded — no vision) ──
+    try {
+      const ai = await import("ai");
+      const openaiCompatible = await import("@ai-sdk/openai-compatible");
+
+      const provider = openaiCompatible.createOpenAICompatible({
+        name: "vly-gateway",
+        baseURL: "https://integrations.vly.ai/v1/llm",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+
+      const model = provider("gpt-4o");
+
+      const result = await ai.generateText({
+        model,
+        messages: [
+          {
+            role: "user",
+            content: EXTRACTION_PROMPT + "\n\n[Images could not be transmitted. Return empty results with LOW confidence.]",
+          },
+        ],
+        temperature: 0.1,
+        maxOutputTokens: 2000,
+      });
+
+      const parsed = parseAiResponse(result.text);
+      if (parsed.frontAnalysis && parsed.backAnalysis) {
+        return {
+          frontAnalysis: parsed.frontAnalysis,
+          backAnalysis: parsed.backAnalysis,
+          extractionConfidence: parsed.extractionConfidence,
+        };
+      }
+    } catch (e: unknown) {
+      console.error("[AHAR X] Text-only fallback failed:", e instanceof Error ? e.message : String(e));
+    }
+
+    throw new Error(
+      "AI analysis service is temporarily unavailable. All connection attempts failed. Please try again.",
+    );
   },
 });
