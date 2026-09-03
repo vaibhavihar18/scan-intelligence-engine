@@ -1,6 +1,6 @@
 /**
- * Parse raw OCR text from front and back food package images
- * into structured data for the AHAR X analysis pipeline.
+ * Robust parsing of OCR text from food package front/back images.
+ * Handles messy OCR output from tesseract.js.
  */
 
 export interface OcrFrontResult {
@@ -30,84 +30,105 @@ export interface OcrBackResult {
   allergens: string[];
 }
 
-// Common food ingredients to detect in front claims
+// Common food ingredients that appear on front-of-pack
 const HIGHLIGHTED_INGREDIENTS = [
-  "hazelnut", "hazelnuts", "almond", "almonds", "cashew", "cashews",
-  "pistachio", "pistachios", "peanut", "peanuts", "walnut", "walnuts",
+  "hazelnut", "almond", "cashew", "pistachio", "peanut", "walnut",
   "saffron", "cardamom", "vanilla", "strawberry", "mango", "coconut",
   "cocoa", "chocolate", "milk", "cream", "butter", "cheese",
   "honey", "jaggery", "dates", "fig", "raisin", "cranberry",
-  "soy", "soya", "wheat", "oat", "oats", "rice", "maize",
+  "soy", "wheat", "oat", "rice", "maize",
   "turmeric", "cinnamon", "ginger", "clove", "nutmeg", "pepper",
   "tomato", "onion", "garlic", "lemon", "lime", "orange", "apple",
-  "banana", "pineapple", "pomegranate", "blueberry", "raspberry",
-  "peach", "apricot", "cherry", "plum",
+  "banana", "pineapple", "pomegranate", "blueberry", "peach", "cherry",
+  "almonds", "cashews", "pistachios", "peanuts", "walnuts", "hazelnuts",
 ];
 
-// Common claims to detect
-const CLAIM_PATTERNS = [
-  /high\s*protein/i, /low\s*sugar/i, /sugar\s*free/i, /no\s*added\s*sugar/i,
-  /low\s*fat/i, /fat\s*free/i, /high\s*fib(?:re|er)/i, /source\s*of\s*protein/i,
-  /100%\s*natural/i, /natural/i, /pure/i, /fresh/i, /authentic/i,
-  /traditional/i, /original/i, /made\s*with/i, /contains/i,
-  /no\s*artificial/i, /no\s*preservat/i, /organic/i, /whole\s*grain/i,
-  /diet/i, /light/i, /lite/i, /zero/i, /amilk/i,
-  /source\s*of\s*fib/i, /good\s*source/i, /rich\s*in/i,
-];
+// Normalize ingredient name for matching
+function normalizeIngredient(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/s$/, "") // Remove trailing 's' for plural
+    .replace(/[^a-z\s]/g, "")
+    .trim();
+}
 
-// Common allergen keywords
-const ALLERGEN_KEYWORDS = [
-  "milk", "dairy", "egg", "eggs", "peanut", "peanuts", "tree nut",
-  "almond", "cashew", "hazelnut", "walnut", "pistachio", "soy", "soya",
-  "wheat", "gluten", "fish", "shellfish", "shrimp", "sesame", "mustard",
-  "celery", "lupin", "sulphite", "sulfite",
-];
+function wordBoundary(name: string): string {
+  return `\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?\\b`;
+}
 
 /**
  * Parse front-of-pack OCR text.
  */
 export function parseFrontOcr(rawText: string): OcrFrontResult {
+  if (!rawText || rawText.trim().length === 0) {
+    return { productName: null, claims: [], highlightedIngredients: [], allergens: [], otherText: [] };
+  }
+
   const lines = rawText.split("\n").map((l) => l.trim()).filter(Boolean);
   const fullText = lines.join(" ");
 
-  // Product name: usually the first prominent line(s)
-  const productName = lines[0] ?? null;
+  // Product name: first meaningful line(s)
+  const productName = lines[0]?.trim() ?? null;
 
-  // Detect claims
+  // Detect claims using flexible patterns
   const claims: string[] = [];
-  for (const pattern of CLAIM_PATTERNS) {
-    const match = fullText.match(pattern);
-    if (match) {
-      claims.push(match[0].trim());
+  const claimPatterns: [RegExp, string][] = [
+    [/high\s*protein/i, "High Protein"],
+    [/low\s*sugar/i, "Low Sugar"],
+    [/sugar\s*free/i, "Sugar Free"],
+    [/no\s*added\s*sugar/i, "No Added Sugar"],
+    [/low\s*fat/i, "Low Fat"],
+    [/fat\s*free/i, "Fat Free"],
+    [/high\s*fib(?:re|er)/i, "High Fibre"],
+    [/source\s*of\s*protein/i, "Source of Protein"],
+    [/100%?\s*natural/i, "100% Natural"],
+    [/natural/i, "Natural"],
+    [/pure/i, "Pure"],
+    [/fresh/i, "Fresh"],
+    [/authentic/i, "Authentic"],
+    [/traditional/i, "Traditional"],
+    [/original/i, "Original"],
+    [/made\s*with/i, "Made With"],
+    [/no\s*artificial/i, "No Artificial"],
+    [/organic/i, "Organic"],
+    [/rich\s*in/i, "Rich In"],
+    [/good\s*source/i, "Good Source"],
+    [/diet/i, "Diet"],
+    [/light/i, "Light"],
+  ];
+
+  for (const [pat, label] of claimPatterns) {
+    if (pat.test(fullText)) {
+      claims.push(label);
     }
   }
 
   // Detect highlighted ingredients
-  const lowerText = fullText.toLowerCase();
   const highlightedIngredients: string[] = [];
   for (const ing of HIGHLIGHTED_INGREDIENTS) {
-    // Word-boundary check
-    const re = new RegExp(`\\b${ing}\\b`, "i");
+    const re = new RegExp(wordBoundary(ing), "i");
     if (re.test(fullText)) {
-      // Capitalize first letter
-      highlightedIngredients.push(ing.charAt(0).toUpperCase() + ing.slice(1));
+      const display = ing.charAt(0).toUpperCase() + ing.slice(1);
+      if (!highlightedIngredients.includes(display)) {
+        highlightedIngredients.push(display);
+      }
     }
   }
-  // Deduplicate
-  const uniqueIngredients = [...new Set(highlightedIngredients)];
 
-  // Allergens on front
+  // Detect allergens on front
   const allergens: string[] = [];
-  for (const ak of ALLERGEN_KEYWORDS) {
-    if (new RegExp(`\\b${ak}\\b`, "i").test(fullText)) {
-      allergens.push(ak.charAt(0).toUpperCase() + ak.slice(1));
+  const allergenWords = ["milk", "dairy", "egg", "peanut", "soy", "wheat", "gluten", "nut"];
+  for (const ak of allergenWords) {
+    if (new RegExp(wordBoundary(ak), "i").test(fullText)) {
+      const display = ak.charAt(0).toUpperCase() + ak.slice(1);
+      if (!allergens.includes(display)) allergens.push(display);
     }
   }
 
   return {
     productName,
     claims,
-    highlightedIngredients: uniqueIngredients,
+    highlightedIngredients,
     allergens: [...new Set(allergens)],
     otherText: lines.slice(1),
   };
@@ -115,20 +136,24 @@ export function parseFrontOcr(rawText: string): OcrFrontResult {
 
 /**
  * Parse back-of-pack OCR text (ingredients + nutrition).
+ * Much more robust than naive regex.
  */
 export function parseBackOcr(rawText: string): OcrBackResult {
-  const lines = rawText.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (!rawText || rawText.trim().length === 0) {
+    return emptyBackResult();
+  }
+
   const fullText = rawText;
 
-  // ── Ingredient list extraction ──
+  // Ingredient list
   const ingredientsList = extractIngredientList(fullText);
   const ingredients = splitIngredients(ingredientsList);
   const ingredientPercentages = extractPercentages(ingredientsList);
 
-  // ── Nutrition extraction ──
+  // Nutrition
   const nutritionPerServing = extractNutrition(fullText);
 
-  // ── Allergen extraction ──
+  // Allergens
   const allergens = extractAllergens(fullText);
 
   return {
@@ -140,34 +165,80 @@ export function parseBackOcr(rawText: string): OcrBackResult {
   };
 }
 
+function emptyBackResult(): OcrBackResult {
+  return {
+    ingredientsList: "",
+    ingredients: [],
+    ingredientPercentages: {},
+    nutritionPerServing: {
+      servingSize: null, calories: null, protein: null, carbohydrates: null,
+      sugars: null, fat: null, saturatedFat: null, transFat: null, fibre: null, sodium: null,
+    },
+    allergens: [],
+  };
+}
+
 function extractIngredientList(text: string): string {
-  // Try to find "Ingredients:" section
-  const ingMatch = text.match(/ing(?:redients?)?\s*[:；]\s*([\s\S]*?)(?=\n\s*(?:nutrition|allergen|allerg|may contain|contains|storage|best before|manufact|mfg|expir|fssai|mrp|m\.?r\.?p|net [wt|weight]|country|marketer|customer|$))/i);
-  if (ingMatch) return ingMatch[1].trim();
+  // Strategy 1: Find "Ingredients:" followed by text until next section
+  const patterns = [
+    // "Ingredients: ..." until nutrition/allergen/storage section
+    /(?:ingredients?|ing)\s*[:;]\s*([\s\S]{10,2000}?)(?=\n\s*(?:nutri|allerg|allergen|may contain|contains|storage|best before|manufact|mfg|expir|fssai|mrp|m\.?r\.?p\.?|net\s*(?:wt|weight|qty)|country|marketer|customer|recip|dir|direction|warning|note|disclaim|shelf|temp|store|cod))/i,
+    // Simpler: "Ingredients: ..." until newline blocks
+    /(?:ingredients?|ing)\s*[:;]\s*([\s\S]{10,1500})/i,
+  ];
 
-  // Fallback: find anything after "Ingredient"
-  const altMatch = text.match(/ingredients?\s*[:；]\s*(.{20,500})/i);
-  if (altMatch) return altMatch[1].trim();
+  for (const pat of patterns) {
+    const match = text.match(pat);
+    if (match && match[1].trim().length > 5) {
+      return match[1].trim();
+    }
+  }
 
-  // Last resort: return all text (may be imperfect)
+  // Fallback: search for known ingredient keywords to find the list
+  const ingKeywords = ["sugar", "salt", "oil", "flour", "milk", "cocoa", "butter", "water", "wheat", "rice"];
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const lower = lines[i].toLowerCase();
+    if (ingKeywords.some((k) => lower.includes(k))) {
+      // Collect consecutive lines that look like ingredients
+      const collected: string[] = [];
+      for (let j = i; j < Math.min(i + 10, lines.length); j++) {
+        const line = lines[j].trim();
+        // Stop if we hit a nutrition table or allergen section
+        if (/nutri|allerg|calor|energy|serving|fssai|mrp/i.test(line)) break;
+        collected.push(line);
+      }
+      if (collected.length > 0) return collected.join(" ");
+    }
+  }
+
+  // Last resort: return first 1000 chars
   return text.slice(0, 1000);
 }
 
 function splitIngredients(list: string): string[] {
-  // Split by commas, semicolons, periods
-  const parts = list.split(/[,;.\n]+/).map((s) => s.trim()).filter((s) => s.length > 1);
+  // Split by commas, semicolons, periods, pipes
+  const parts = list.split(/[,;.\n|]+/).map((s) => s.trim()).filter((s) => s.length > 1 && s.length < 100);
   return parts;
 }
 
 function extractPercentages(text: string): Record<string, string> {
   const result: Record<string, string> = {};
-  // Match patterns like "ingredient (5.2%)" or "ingredient — 0.1%" or "ingredient 5.2%"
-  const re = /([A-Za-z\s]+?)\s*[\(—\-]?\s*(\d+(?:\.\d+)?)\s*%\s*[\)]?/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const name = m[1].trim().toLowerCase();
-    const pct = `${m[2]}%`;
-    if (name.length > 1) result[name] = pct;
+  // Patterns: "ingredient (5.2%)", "ingredient — 0.1%", "ingredient 5.2%"
+  const patterns = [
+    /([A-Za-z][A-Za-z\s]+?)\s*\((\d+(?:\.\d+)?)\s*%\)/g,
+    /([A-Za-z][A-Za-z\s]+?)\s*[-—]\s*(\d+(?:\.\d+)?)\s*%/g,
+    /([A-Za-z][A-Za-z\s]+?)\s+(\d+(?:\.\d+)?)\s*%/g,
+  ];
+
+  for (const pat of patterns) {
+    let m: RegExpExecArray | null;
+    while ((m = pat.exec(text)) !== null) {
+      const name = m[1].trim().toLowerCase();
+      if (name.length > 1 && name.length < 50) {
+        result[name] = `${m[2]}%`;
+      }
+    }
   }
   return result;
 }
@@ -186,48 +257,66 @@ function extractNutrition(text: string): OcrBackResult["nutritionPerServing"] {
     sodium: null as number | null,
   };
 
-  // Serving size
-  const servMatch = text.match(/serving\s*size\s*[:；]?\s*([^\n]{2,40})/i);
-  if (servMatch) n.servingSize = servMatch[1].trim();
+  // Find the nutrition section
+  const nutritionSection = text.match(/(?:nutrition|nutritional|nutrient)\s*(?:information|facts|data|table|content|details)?\s*[:;]?([\s\S]{50,800})/i);
+  const searchArea = nutritionSection ? nutritionSection[1] : text;
 
-  // Calories / Energy
-  const calMatch = text.match(/(?:calori?e?s?|energy)\s*[:；]?\s*(\d+(?:\.\d+)?)\s*(?:kcal|cal|kj)?/i);
+  // Serving size
+  const servMatch = searchArea.match(/serving\s*size\s*[:;]?\s*([^\n]{2,50})/i);
+  if (servMatch) n.servingSize = servMatch[1].trim().slice(0, 50);
+
+  // Helper: extract a number after a keyword
+  function extractNum(keyword: string, unit: string = ""): number | null {
+    const re = new RegExp(keyword + "\\s*[:;]?\\s*(\\d+(?:\\.\\d+)?)\\s*" + unit, "i");
+    const m = searchArea.match(re);
+    return m ? parseFloat(m[1]) : null;
+  }
+
+  // Energy/Calories
+  const calMatch = searchArea.match(/(?:energy|calori?e?s?)\s*[:;]?\s*(\d+(?:\.\d+)?)\s*(kcal|cal|kj)?/i);
   if (calMatch) n.calories = parseFloat(calMatch[1]);
 
   // Protein
-  const protMatch = text.match(/protein\s*[:；]?\s*(\d+(?:\.\d+)?)\s*g?/i);
-  if (protMatch) n.protein = parseFloat(protMatch[1]);
+  n.protein = extractNum("protein");
 
   // Carbohydrates
-  const carbMatch = text.match(/(?:carbohydrat?e?s?|carbs?)\s*[:；]?\s*(\d+(?:\.\d+)?)\s*g?/i);
-  if (carbMatch) n.carbohydrates = parseFloat(carbMatch[1]);
+  n.carbohydrates = extractNum("(?:carbohydrat?e?s?|carbs?)");
 
-  // Total sugars
-  const sugMatch = text.match(/(?:total\s*)?sugars?\s*[:；]?\s*(\d+(?:\.\d+)?)\s*g?/i);
-  if (sugMatch) n.sugars = parseFloat(sugMatch[1]);
+  // Sugars
+  n.sugars = extractNum("(?:total\\s*)?sugars?");
 
-  // Total fat
-  const fatMatch = text.match(/(?:total\s*)?fat\s*[:；]?\s*(\d+(?:\.\d+)?)\s*g?/i);
-  if (fatMatch) n.fat = parseFloat(fatMatch[1]);
+  // Fat
+  n.fat = extractNum("(?:total\\s*)?fat");
 
   // Saturated fat
-  const satMatch = text.match(/satu?rat(?:ed)?\s*fat\s*[:；]?\s*(\d+(?:\.\d+)?)\s*g?/i);
+  const satMatch = searchArea.match(/satu?rat(?:ed)?\s*fat\s*[:;]?\s*(\d+(?:\.\d+)?)/i);
   if (satMatch) n.saturatedFat = parseFloat(satMatch[1]);
 
   // Trans fat
-  const transMatch = text.match(/trans\s*fat\s*[:；]?\s*(\d+(?:\.\d+)?)\s*g?/i);
+  const transMatch = searchArea.match(/trans\s*fat\s*[:;]?\s*(\d+(?:\.\d+)?)/i);
   if (transMatch) n.transFat = parseFloat(transMatch[1]);
 
   // Fibre
-  const fibreMatch = text.match(/fib(?:re|er)\s*[:；]?\s*(\d+(?:\.\d+)?)\s*g?/i);
+  const fibreMatch = searchArea.match(/fib(?:re|er)\s*[:;]?\s*(\d+(?:\.\d+)?)/i);
   if (fibreMatch) n.fibre = parseFloat(fibreMatch[1]);
 
   // Sodium
-  const sodMatch = text.match(/sodium\s*[:；]?\s*(\d+(?:\.\d+)?)\s*(?:mg|g)?/i);
+  const sodMatch = searchArea.match(/sodium\s*[:;]?\s*(\d+(?:\.\d+)?)\s*(mg|g)?/i);
   if (sodMatch) {
     const val = parseFloat(sodMatch[1]);
-    // If value is small (<10), it's probably grams; convert to mg
     n.sodium = val < 10 ? val * 1000 : val;
+  }
+
+  // If no nutrition section found, try full text as fallback
+  if (n.calories === null && n.protein === null) {
+    const allCalMatch = text.match(/(?:energy|calori?e?s?)\s*[:;]?\s*(\d+(?:\.\d+)?)\s*(kcal|cal|kj)/i);
+    if (allCalMatch) n.calories = parseFloat(allCalMatch[1]);
+
+    const allProtMatch = text.match(/protein\s*[:;]?\s*(\d+(?:\.\d+)?)\s*g/i);
+    if (allProtMatch) n.protein = parseFloat(allProtMatch[1]);
+
+    const allSugMatch = text.match(/sugars?\s*[:;]?\s*(\d+(?:\.\d+)?)\s*g/i);
+    if (allSugMatch) n.sugars = parseFloat(allSugMatch[1]);
   }
 
   return n;
@@ -235,24 +324,36 @@ function extractNutrition(text: string): OcrBackResult["nutritionPerServing"] {
 
 function extractAllergens(text: string): string[] {
   const allergens: string[] = [];
+  const allergenKeywords = [
+    "milk", "dairy", "egg", "peanut", "peanuts", "almond", "cashew",
+    "hazelnut", "walnut", "pistachio", "soy", "soya", "wheat", "gluten",
+    "fish", "shellfish", "sesame", "mustard", "sulphite", "sulfite",
+  ];
 
-  // Look for "Contains:" or "Allergen:" declarations
-  const containsMatch = text.match(/(?:contains|allergen[s]?|may contain)[:；]?\s*([^\n]{2,200})/i);
-  if (containsMatch) {
-    const allergenText = containsMatch[1];
-    for (const ak of ALLERGEN_KEYWORDS) {
-      if (new RegExp(`\\b${ak}\\b`, "i").test(allergenText)) {
-        allergens.push(ak.charAt(0).toUpperCase() + ak.slice(1));
+  // Check for "Contains:" or "Allergen:" declarations
+  const declMatch = text.match(/(?:contains|allergen[s]?|may\s*contain)\s*[:;]?\s*([^\n]{2,300})/i);
+  if (declMatch) {
+    for (const ak of allergenKeywords) {
+      if (new RegExp(wordBoundary(ak), "i").test(declMatch[1])) {
+        const display = ak.charAt(0).toUpperCase() + ak.slice(1);
+        if (!allergens.includes(display)) allergens.push(display);
       }
     }
   }
 
-  // Also check full text for common allergen words in ingredient context
-  for (const ak of ALLERGEN_KEYWORDS) {
-    if (new RegExp(`\\b${ak}\\b`, "i").test(text) && !allergens.includes(ak.charAt(0).toUpperCase() + ak.slice(1))) {
-      allergens.push(ak.charAt(0).toUpperCase() + ak.slice(1));
+  // Also scan ingredient list for allergen words
+  const ingMatch = text.match(/(?:ingredients?|ing)\s*[:;]\s*([\s\S]{10,1500})/i);
+  if (ingMatch) {
+    for (const ak of allergenKeywords) {
+      if (new RegExp(wordBoundary(ak), "i").test(ingMatch[1])) {
+        const display = ak.charAt(0).toUpperCase() + ak.slice(1);
+        if (!allergens.includes(display)) allergens.push(display);
+      }
     }
   }
 
-  return [...new Set(allergens)];
+  return allergens;
 }
+
+// Re-export normalizeIngredient for external use
+export { normalizeIngredient };

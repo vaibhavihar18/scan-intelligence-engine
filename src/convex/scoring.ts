@@ -209,12 +209,23 @@ export function verifyIngredients(
 
   return frontHighlights.map((frontIng) => {
     const normalizedFront = frontIng.toLowerCase().trim();
-    const match = backIngredients.find(
-      (backIng) =>
-        backIng.toLowerCase().trim() === normalizedFront ||
-        backIng.toLowerCase().includes(normalizedFront) ||
-        normalizedFront.includes(backIng.toLowerCase().trim()),
-    );
+    const normFront = normalizedFront.replace(/s$/, ""); // strip trailing 's'
+
+    const match = backIngredients.find((backIng) => {
+      const normalizedBack = backIng.toLowerCase().trim();
+      const normBack = normalizedBack.replace(/s$/, "");
+      // Exact match
+      if (normalizedBack === normalizedFront) return true;
+      // Root match (strip trailing s)
+      if (normBack === normFront) return true;
+      // Containment (front in back or back in front)
+      if (normalizedBack.includes(normalizedFront) || normalizedFront.includes(normalizedBack)) return true;
+      // Root containment
+      if (normBack.includes(normFront) || normFront.includes(normBack)) return true;
+      // Word boundary match on individual words
+      const frontWords = normalizedFront.split(/\s+/);
+      return frontWords.some((w) => normalizedBack.includes(w) && w.length > 3);
+    });
 
     if (!match) {
       if (backConfidence === "LOW") {
