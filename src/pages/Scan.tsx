@@ -4,6 +4,8 @@ import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLocation, useNavigate } from "react-router";
 import { compressImage, validateImage } from "@/lib/imageCompress";
+import { runOcrOnDataUrl } from "@/lib/ocr";
+import { parseFrontOcr, parseBackOcr } from "@/lib/parseOcr";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -87,50 +89,64 @@ export default function Scan() {
     if (!frontImage || !backImage) return;
     setStep("analyzing"); setProgress(0); setLoadingStep(0); setError(null);
     try {
-      // Step 0: Compress images
+      // Step 1: Compress images
       setLoadingStep(0); setProgress(5);
       const frontDataUrl = await compressImage(frontImage);
       setLoadingStep(1); setProgress(15);
       const backDataUrl = await compressImage(backImage);
 
-      // Step 1: Create scan session (use placeholder storage IDs since we're sending base64)
+      // Step 2: Run client-side OCR on both images (always works, no API key needed)
       setLoadingStep(2); setProgress(25);
-      const frontId = `dataurl_front_${Date.now()}`;
-      const backId = `dataurl_back_${Date.now()}`;
+      let ocrFrontText = "";
+      let ocrBackText = "";
+      try {
+        setLoadingStep(3); setProgress(30);
+        ocrFrontText = await runOcrOnDataUrl(frontDataUrl);
+        setLoadingStep(4); setProgress(40);
+        ocrBackText = await runOcrOnDataUrl(backDataUrl);
+      } catch (ocrErr) {
+        console.error("[AHAR X] Client-side OCR failed:", ocrErr);
+      }
+
+      // Step 3: Parse OCR text into structured data
+      setLoadingStep(5); setProgress(50);
+      const ocrFront = parseFrontOcr(ocrFrontText);
+      const ocrBack = parseBackOcr(ocrBackText);
+
+      // Step 4: Create scan session
+      setLoadingStep(6); setProgress(55);
       const { sessionId, docId } = await createScanSession({
-        frontImageId: frontId,
-        backImageId: backId,
+        frontImageId: `ocr_front_${Date.now()}`,
+        backImageId: `ocr_back_${Date.now()}`,
         profileCategory,
         language,
       });
       setScanId(sessionId);
 
-      // Step 2-9: Send to backend for AI analysis
-      setLoadingStep(3); setProgress(35);
-      for (let i = 4; i <= 9; i++) { setLoadingStep(i); setProgress(35 + (i - 3) * 8); await new Promise((r) => setTimeout(r, 200)); }
-      setLoadingStep(10); setProgress(85);
+      // Step 5: Send to backend (AI is optional — OCR data is always provided)
+      setLoadingStep(7); setProgress(65);
       const result = await runFullScan({
         docId,
         scanSessionId: sessionId,
         frontImageUrl: frontDataUrl,
         backImageUrl: backDataUrl,
         profileCategory,
+        ocrFront,
+        ocrBack,
       });
-      setProgress(100); setAnalysis(result as unknown as ScanAnalysis); setScanDate(Date.now()); setStep("results");
+
+      // Step 6: Always show results
+      setLoadingStep(10); setProgress(100);
+      setAnalysis(result as unknown as ScanAnalysis);
+      setScanDate(Date.now());
+      setStep("results");
     } catch (err) {
       console.error("Scan failed:", err);
-      const msg = err instanceof Error ? err.message : "Scan failed. Please try again.";
-      // Provide specific error guidance
-      if (msg.includes("not configured") || msg.includes("VLY_INTEGRATION_KEY")) {
-        setError("AI analysis service is not configured. Please check that VLY_INTEGRATION_KEY is set in the Convex dashboard under Settings > Environment Variables.");
-      } else if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-        setError("Unable to connect to the analysis service. Please check your internet connection and try again.");
-      } else if (msg.includes("AI analysis service error")) {
-        setError(msg);
-      } else if (msg.includes("Failed to parse AI response")) {
-        setError("The AI could not produce a structured analysis from the uploaded images. Please try uploading clearer images.");
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Not authenticated")) {
+        setError("Please sign in to analyze products.");
       } else {
-        setError(msg);
+        setError("Analysis encountered an issue. Please try again.");
       }
       setStep("upload");
     }

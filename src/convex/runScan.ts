@@ -49,6 +49,34 @@ type AiResult = {
   };
 };
 
+/** Type for client-side OCR results */
+type OcrFrontData = {
+  productName: string | null;
+  claims: string[];
+  highlightedIngredients: string[];
+  allergens: string[];
+  otherText: string[];
+};
+
+type OcrBackData = {
+  ingredientsList: string;
+  ingredients: string[];
+  ingredientPercentages: Record<string, string>;
+  nutritionPerServing: {
+    servingSize: string | null;
+    calories: number | null;
+    protein: number | null;
+    carbohydrates: number | null;
+    sugars: number | null;
+    fat: number | null;
+    saturatedFat: number | null;
+    transFat: number | null;
+    fibre: number | null;
+    sodium: number | null;
+  };
+  allergens: string[];
+};
+
 // Orchestrates the full scan pipeline for a session
 export const runFullScan = action({
   args: {
@@ -64,11 +92,12 @@ export const runFullScan = action({
       v.literal("vegetarian"),
       v.literal("highProtein"),
     )),
+    // Client-side OCR results (always provided)
+    ocrFront: v.any(),
+    ocrBack: v.any(),
   },
   handler: async (ctx, args): Promise<Record<string, unknown>> => {
     console.log("[AHAR X] runFullScan called");
-    console.log("[AHAR X] frontImageUrl type:", typeof args.frontImageUrl, "length:", args.frontImageUrl?.length);
-    console.log("[AHAR X] backImageUrl type:", typeof args.backImageUrl, "length:", args.backImageUrl?.length);
     console.log("[AHAR X] profileCategory:", args.profileCategory);
 
     // 1. Update status to analyzing
@@ -78,23 +107,96 @@ export const runFullScan = action({
     });
 
     try {
-      // 2. Run AI vision analysis
-      console.log("[AHAR X] Calling analyzeImages...");
-      const aiResult = (await ctx.runAction(
-        api.analyzeLabel.analyzeImages,
-        {
-          frontImageUrl: args.frontImageUrl,
-          backImageUrl: args.backImageUrl,
-          scanSessionId: args.scanSessionId,
-        },
-      )) as AiResult;
+      const emptyNutrition = { servingSize: null, calories: null, protein: null, carbohydrates: null, sugars: null, fat: null, saturatedFat: null, transFat: null, fibre: null, sodium: null };
+      let front: AiResult["frontAnalysis"] = { productName: null, claims: [], highlightedIngredients: [], allergens: [], otherText: [], vegetarianSymbol: null };
+      let back: AiResult["backAnalysis"] = { ingredientsList: "", ingredients: [], ingredientPercentages: {}, nutritionPerServing: emptyNutrition, allergens: [], qualifiers: [], footnotes: [], regulatoryInfo: {} };
+      let confidence: AiResult["extractionConfidence"] = { frontOverall: "LOW", backOverall: "LOW", frontNotes: "", backNotes: "" };
+      let usedAi = false;
 
-      const front: AiResult["frontAnalysis"] = aiResult.frontAnalysis;
-      const back: AiResult["backAnalysis"] = aiResult.backAnalysis;
-      const confidence: AiResult["extractionConfidence"] =
-        aiResult.extractionConfidence;
+      // 2. Try AI analysis (optional enhancement)
+      try {
+        console.log("[AHAR X] Attempting AI analysis...");
+        const aiResult = (await ctx.runAction(
+          api.analyzeLabel.analyzeImages,
+          {
+            frontImageUrl: args.frontImageUrl,
+            backImageUrl: args.backImageUrl,
+            scanSessionId: args.scanSessionId,
+          },
+        )) as AiResult;
 
-      // 3. Build nutrition data from extracted evidence
+        if (aiResult?.frontAnalysis && aiResult?.backAnalysis) {
+          front = aiResult.frontAnalysis;
+          back = aiResult.backAnalysis;
+          confidence = aiResult.extractionConfidence;
+          usedAi = true;
+          console.log("[AHAR X] AI analysis succeeded");
+        } else {
+          throw new Error("AI returned incomplete data");
+        }
+      } catch (aiError: unknown) {
+        const msg = aiError instanceof Error ? aiError.message : String(aiError);
+        console.error("[AHAR X] AI analysis failed, using OCR data:", msg.slice(0, 200));
+      }
+
+      // 3. If AI failed, use client-side OCR results
+      if (!usedAi) {
+        console.log("[AHAR X] Using client-side OCR data");
+
+        const ocrFront = args.ocrFront as OcrFrontData;
+        const ocrBack = args.ocrBack as OcrBackData;
+
+        // Determine confidence based on OCR quality heuristics
+        const backHasIngredients = ocrBack.ingredients.length > 3;
+        const backHasNutrition = ocrBack.nutritionPerServing.calories !== null ||
+          ocrBack.nutritionPerServing.protein !== null;
+        const frontHasText = ocrFront.highlightedIngredients.length > 0 ||
+          ocrFront.claims.length > 0;
+
+        front = {
+          productName: ocrFront.productName ?? null,
+          claims: ocrFront.claims ?? [],
+          highlightedIngredients: ocrFront.highlightedIngredients ?? [],
+          allergens: ocrFront.allergens ?? [],
+          otherText: ocrFront.otherText ?? [],
+          vegetarianSymbol: null,
+        };
+
+        back = {
+          ingredientsList: ocrBack.ingredientsList ?? "",
+          ingredients: ocrBack.ingredients ?? [],
+          ingredientPercentages: ocrBack.ingredientPercentages ?? {},
+          nutritionPerServing: {
+            servingSize: ocrBack.nutritionPerServing?.servingSize ?? null,
+            calories: ocrBack.nutritionPerServing?.calories ?? null,
+            protein: ocrBack.nutritionPerServing?.protein ?? null,
+            carbohydrates: ocrBack.nutritionPerServing?.carbohydrates ?? null,
+            sugars: ocrBack.nutritionPerServing?.sugars ?? null,
+            fat: ocrBack.nutritionPerServing?.fat ?? null,
+            saturatedFat: ocrBack.nutritionPerServing?.saturatedFat ?? null,
+            transFat: ocrBack.nutritionPerServing?.transFat ?? null,
+            fibre: ocrBack.nutritionPerServing?.fibre ?? null,
+            sodium: ocrBack.nutritionPerServing?.sodium ?? null,
+          },
+          allergens: ocrBack.allergens ?? [],
+          qualifiers: [],
+          footnotes: [],
+          regulatoryInfo: {},
+        };
+
+        confidence = {
+          frontOverall: frontHasText ? "MEDIUM" : "LOW",
+          backOverall: backHasIngredients ? (backHasNutrition ? "MEDIUM" : "LOW") : "LOW",
+          frontNotes: frontHasText
+            ? "Extracted via client-side OCR"
+            : "Front label text could not be read reliably by OCR",
+          backNotes: backHasIngredients
+            ? "Extracted via client-side OCR"
+            : "Back label text could not be read reliably by OCR",
+        };
+      }
+
+      // 4. Build nutrition data
       const nutrition: NutritionData = {
         servingSize: back.nutritionPerServing?.servingSize ?? null,
         calories: back.nutritionPerServing?.calories ?? null,
@@ -108,7 +210,7 @@ export const runFullScan = action({
         sodium: back.nutritionPerServing?.sodium ?? null,
       };
 
-      // 4. Verify front ↔ back ingredients
+      // 5. Verify front ↔ back ingredients
       const ingredientVerifications = verifyIngredients(
         front.highlightedIngredients ?? [],
         back.ingredients ?? [],
@@ -117,7 +219,7 @@ export const runFullScan = action({
         confidence.backOverall,
       );
 
-      // 5. Run FSSAI rule engine
+      // 6. Run FSSAI rule engine
       const allAllergens = [
         ...new Set([
           ...(front.allergens ?? []),
@@ -136,10 +238,10 @@ export const runFullScan = action({
         confidence.backOverall,
       );
 
-      // 6. Determine profile category
+      // 7. Determine profile category
       const profileCategory: ProfileCategory = (args.profileCategory as ProfileCategory) ?? "general";
 
-      // 7. Calculate AHAR X score
+      // 8. Calculate AHAR X score
       const aharScore = calculateAharScore(
         nutrition,
         profileCategory,
@@ -147,12 +249,12 @@ export const runFullScan = action({
         allAllergens,
       );
 
-      // 8. Assess profile suitability
-      console.log("[AHAR X] AI analysis complete, building results...");
+      // 9. Assess profile suitability
+      console.log("[AHAR X] Building results...");
       console.log("[AHAR X] Product:", front.productName);
       console.log("[AHAR X] Front claims:", front.claims?.length);
       console.log("[AHAR X] Back ingredients:", back.ingredients?.length);
-      console.log("[AHAR X] Verification results:", ingredientVerifications.length);
+      console.log("[AHAR X] AI used:", usedAi);
 
       const suitability = assessSuitability(
         nutrition,
@@ -162,10 +264,15 @@ export const runFullScan = action({
         front.vegetarianSymbol ?? null,
       );
 
-      // 9. Build limitations
+      // 10. Build limitations
       const limitations: string[] = [
         "AHAR X analyzes the manufacturer's declared label information. It does not laboratory-test the product.",
       ];
+      if (!usedAi) {
+        limitations.push(
+          "Analysis was performed using client-side OCR. For enhanced accuracy, an AI vision service may be used when available.",
+        );
+      }
       if (confidence.backOverall === "LOW") {
         limitations.push(
           "Some conclusions may be unavailable because the supplied label image could not be read reliably.",
@@ -177,9 +284,9 @@ export const runFullScan = action({
         );
       }
 
-      // 10. Build simple explanation
+      // 11. Build simple explanation
       const explanationParts: string[] = [];
-      explanationParts.push(`Product: ${front.productName ?? "Unknown"}`);
+      explanationParts.push(`Product: ${front.productName ?? "Product name not readable"}`);
 
       if (nutrition.calories !== null) {
         explanationParts.push(`Calories: ${nutrition.calories} kcal per serving`);
@@ -206,9 +313,13 @@ export const runFullScan = action({
         }
       }
 
+      if (allAllergens.length > 0) {
+        explanationParts.push(`Allergens: ${allAllergens.join(", ")}`);
+      }
+
       const simpleExplanation = explanationParts.join(". ");
 
-      // 11. Build full analysis object
+      // 12. Build full analysis object
       const analysis: Record<string, unknown> = {
         productName: front.productName ?? null,
         frontClaims: front.claims ?? [],
@@ -226,16 +337,17 @@ export const runFullScan = action({
         aharScore,
         simpleExplanation,
         limitations,
+        analysisSource: usedAi ? "ai_vision" : "client_ocr",
       };
 
-      // 12. Save results
+      // 13. Save results
       await ctx.runMutation(api.scanSessions.saveAnalysis, {
         docId: args.docId,
         productName: front.productName ?? undefined,
         analysis,
       });
 
-      // 13. Save evidence trail
+      // 14. Save evidence trail
       const evidenceItems = [
         ...(front.claims ?? []).map((claim) => ({
           scanSessionId: args.scanSessionId,
