@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLocation, useNavigate } from "react-router";
+import { compressImage, validateImage } from "@/lib/imageCompress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +68,8 @@ export default function Scan() {
   }, [pastScan]);
 
   const handleFileSelect = useCallback((file: File, side: "front" | "back") => {
+    const err = validateImage(file);
+    if (err) { setError(err); return; }
     const url = URL.createObjectURL(file);
     if (side === "front") { setFrontImage(file); setFrontPreview(url); }
     else { setBackImage(file); setBackPreview(url); }
@@ -82,27 +85,47 @@ export default function Scan() {
     if (!frontImage || !backImage) return;
     setStep("analyzing"); setProgress(0); setLoadingStep(0); setError(null);
     try {
+      // Step 0: Compress images
       setLoadingStep(0); setProgress(5);
-      const fu = await fetch(`${import.meta.env.VITE_CONVEX_URL}/api/storage/upload`, { method: "POST", headers: { "Content-Type": frontImage.type }, body: frontImage });
-      if (!fu.ok) throw new Error("The uploaded image could not be processed.");
-      const fd = await fu.json();
+      const frontDataUrl = await compressImage(frontImage);
       setLoadingStep(1); setProgress(15);
-      const bu = await fetch(`${import.meta.env.VITE_CONVEX_URL}/api/storage/upload`, { method: "POST", headers: { "Content-Type": backImage.type }, body: backImage });
-      if (!bu.ok) throw new Error("The uploaded image could not be processed.");
-      const bd = await bu.json();
+      const backDataUrl = await compressImage(backImage);
+
+      // Step 1: Create scan session (use placeholder storage IDs since we're sending base64)
       setLoadingStep(2); setProgress(25);
-      const { sessionId, docId } = await createScanSession({ frontImageId: fd.storageId, backImageId: bd.storageId, profileCategory, language });
+      const frontId = `dataurl_front_${Date.now()}`;
+      const backId = `dataurl_back_${Date.now()}`;
+      const { sessionId, docId } = await createScanSession({
+        frontImageId: frontId,
+        backImageId: backId,
+        profileCategory,
+        language,
+      });
       setScanId(sessionId);
+
+      // Step 2-9: Send to backend for AI analysis
       setLoadingStep(3); setProgress(35);
-      const fuUrl = `${import.meta.env.VITE_CONVEX_URL}/api/storage/${fd.storageId}`;
-      const buUrl = `${import.meta.env.VITE_CONVEX_URL}/api/storage/${bd.storageId}`;
-      for (let i = 4; i <= 9; i++) { setLoadingStep(i); setProgress(35 + (i - 3) * 8); await new Promise((r) => setTimeout(r, 300)); }
+      for (let i = 4; i <= 9; i++) { setLoadingStep(i); setProgress(35 + (i - 3) * 8); await new Promise((r) => setTimeout(r, 200)); }
       setLoadingStep(10); setProgress(85);
-      const result = await runFullScan({ docId, scanSessionId: sessionId, frontImageUrl: fuUrl, backImageUrl: buUrl, profileCategory });
+      const result = await runFullScan({
+        docId,
+        scanSessionId: sessionId,
+        frontImageUrl: frontDataUrl,
+        backImageUrl: backDataUrl,
+        profileCategory,
+      });
       setProgress(100); setAnalysis(result as unknown as ScanAnalysis); setStep("results");
     } catch (err) {
       console.error("Scan failed:", err);
-      setError(err instanceof Error ? err.message : "Scan failed. Please try again.");
+      const msg = err instanceof Error ? err.message : "Scan failed. Please try again.";
+      // Provide specific error guidance
+      if (msg.includes("OPENAI_API_KEY")) {
+        setError("Analysis service is not configured. Please add an OpenAI API key in the project settings.");
+      } else if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+        setError("Unable to connect to the analysis service. Please check your connection.");
+      } else {
+        setError(msg);
+      }
       setStep("upload");
     }
   };

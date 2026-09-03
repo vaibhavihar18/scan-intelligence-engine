@@ -1,3 +1,5 @@
+"use node";
+
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 
@@ -88,6 +90,7 @@ Respond with ONLY the JSON object. No markdown formatting, no explanation.`;
       body: JSON.stringify({
         model: "gpt-4o",
         max_tokens: 4000,
+        temperature: 0.1,
         messages: [
           {
             role: "user",
