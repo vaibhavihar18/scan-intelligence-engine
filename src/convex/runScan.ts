@@ -147,11 +147,17 @@ export const runFullScan = action({
         const ocrBack = args.ocrBack as OcrBackData;
 
         // Determine confidence based on OCR quality heuristics
-        const backHasIngredients = ocrBack.ingredients.length > 3;
+        // More generous: any extracted data counts as evidence
+        const backHasIngredients = ocrBack.ingredients.length > 0;
         const backHasNutrition = ocrBack.nutritionPerServing.calories !== null ||
-          ocrBack.nutritionPerServing.protein !== null;
+          ocrBack.nutritionPerServing.protein !== null ||
+          ocrBack.nutritionPerServing.sugars !== null ||
+          ocrBack.nutritionPerServing.fat !== null ||
+          ocrBack.nutritionPerServing.carbohydrates !== null;
         const frontHasText = ocrFront.highlightedIngredients.length > 0 ||
-          ocrFront.claims.length > 0;
+          ocrFront.claims.length > 0 ||
+          ocrFront.productName !== null;
+        const backHasAllergens = ocrBack.allergens.length > 0;
 
         front = {
           productName: ocrFront.productName ?? null,
@@ -184,14 +190,21 @@ export const runFullScan = action({
           regulatoryInfo: {},
         };
 
+        // More generous confidence: any data extracted counts
+        const frontConf: "HIGH" | "MEDIUM" | "LOW" =
+          frontHasText ? (ocrFront.highlightedIngredients.length > 0 ? "HIGH" : "MEDIUM") : "LOW";
+        const backConf: "HIGH" | "MEDIUM" | "LOW" =
+          backHasIngredients
+            ? (backHasNutrition ? "HIGH" : backHasAllergens ? "MEDIUM" : "MEDIUM")
+            : "LOW";
         confidence = {
-          frontOverall: frontHasText ? "MEDIUM" : "LOW",
-          backOverall: backHasIngredients ? (backHasNutrition ? "MEDIUM" : "LOW") : "LOW",
+          frontOverall: frontConf,
+          backOverall: backConf,
           frontNotes: frontHasText
             ? "Extracted via client-side OCR"
             : "Front label text could not be read reliably by OCR",
           backNotes: backHasIngredients
-            ? "Extracted via client-side OCR"
+            ? `Extracted via client-side OCR (${ocrBack.ingredients.length} ingredients, ${ocrBack.nutritionPerServing.calories !== null ? 'nutrition' : 'no nutrition'})`
             : "Back label text could not be read reliably by OCR",
         };
       }

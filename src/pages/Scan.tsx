@@ -279,12 +279,98 @@ export default function Scan() {
               </div>
             </div>
 
-            {/* 1. Front Claims */}
+            {/* BIG SIMPLE VERDICT — First thing judges see */}
+            <div className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex size-10 items-center justify-center rounded-xl ahar-gradient text-white">
+                  <ScanLine className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold tracking-tight">AHAR X {t("result.title", language)}</h2>
+                  {analysis.productName && <p className="text-sm font-medium text-primary">{analysis.productName}</p>}
+                </div>
+              </div>
+
+              {/* Simple verdict grid */}
+              <div className="grid gap-4 sm:grid-cols-3 mb-4">
+                {/* FRONT SAYS */}
+                <div className="rounded-xl bg-background/80 p-4 border border-border/50">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{language === "mr" ? "समोर काय" : language === "hi" ? "सामने क्या" : "FRONT SAYS"}</p>
+                  {analysis.frontClaims.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {analysis.frontClaims.slice(0, 5).map((c, i) => <Badge key={i} variant="secondary" className="text-xs">{c}</Badge>)}
+                    </div>
+                  ) : analysis.frontHighlightedIngredients.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {analysis.frontHighlightedIngredients.map((ing, i) => <Badge key={i} variant="secondary" className="text-xs">{ing}</Badge>)}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t("status.insufficientEvidence", language)}</p>
+                  )}
+                </div>
+
+                {/* BACK DECLARES */}
+                <div className="rounded-xl bg-background/80 p-4 border border-border/50">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{language === "mr" ? "माग काय" : language === "hi" ? "पीछे क्या" : "BACK DECLARES"}</p>
+                  {analysis.backIngredients.length > 0 ? (
+                    <p className="text-sm">{analysis.backIngredients.length} {language === "mr" ? "घटक" : language === "hi" ? "सामग्री" : "ingredients"} {language === "mr" ? "आढळले" : language === "hi" ? "मिले" : "found"}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t("error.unreadable", language)}</p>
+                  )}
+                  {analysis.allergens.length > 0 && (
+                    <p className="mt-1 text-xs text-amber-600">⚠ {language === "mr" ? "अॅलर्जेन" : language === "hi" ? "एलर्जन" : "Allergens"}: {analysis.allergens.join(", ")}</p>
+                  )}
+                </div>
+
+                {/* VERDICT */}
+                <div className={`rounded-xl p-4 border-2 ${
+                  analysis.ingredientVerifications.some(v => v.status === "potential_inconsistency")
+                    ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800"
+                    : analysis.ingredientVerifications.some(v => v.status === "match_confirmed")
+                      ? "border-green-400 bg-green-50 dark:bg-green-950/30 dark:border-green-800"
+                      : "border-border bg-background/80"
+                }`}>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{language === "mr" ? "AHAR X निष्कर्ष" : language === "hi" ? "AHAR X निष्कर्ष" : "AHAR X FINDING"}</p>
+                  {analysis.ingredientVerifications.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {analysis.ingredientVerifications.map((v, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          {v.status === "match_confirmed" ? <CheckCircle className="size-4 text-green-600 shrink-0" /> : v.status === "potential_inconsistency" ? <AlertTriangle className="size-4 text-amber-600 shrink-0" /> : <Info className="size-4 text-muted-foreground shrink-0" />}
+                          <span className="text-sm font-medium">{v.ingredient}</span>
+                          <span className="text-xs text-muted-foreground">{statusText(v.status)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t("status.insufficientEvidence", language)}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Score + profile quick summary */}
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold">{analysis.aharScore.overall.toFixed(1)}</span>
+                  <span className="text-muted-foreground">/ 10</span>
+                </div>
+                <div className="h-6 w-px bg-border" />
+                <span className="text-muted-foreground">{PROFILE_LABELS[profileCategory]?.[language] ?? profileCategory}</span>
+                {scanDate && <><div className="h-6 w-px bg-border" /><span className="text-muted-foreground text-xs">{formatDate(scanDate)}</span></>}
+              </div>
+            </div>
+
+            {/* 1. Front Claims — expanded view */}
             <Card className="border-border/70"><CardHeader><CardTitle className="text-base">{t("section.frontClaims", language)}</CardTitle></CardHeader><CardContent>
               {analysis.frontClaims.length > 0 ? <div className="flex flex-wrap gap-2">{analysis.frontClaims.map((c, i) => <Badge key={i} variant="secondary">{c}</Badge>)}</div> : <p className="text-sm text-muted-foreground">{t("status.insufficientEvidence", language)}</p>}
+              {analysis.frontHighlightedIngredients.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground mb-1.5">{language === "mr" ? "प्रमुख घटक" : language === "hi" ? "प्रमुख सामग्री" : "Highlighted Ingredients"}:</p>
+                  <div className="flex flex-wrap gap-1.5">{analysis.frontHighlightedIngredients.map((ing, i) => <Badge key={i} variant="outline" className="text-xs">{ing}</Badge>)}</div>
+                </div>
+              )}
             </CardContent></Card>
 
-            {/* 2. Back Declares */}
+            {/* 2. Back Declares — expanded view */}
             <Card className="border-border/70"><CardHeader><CardTitle className="text-base">{t("section.backDeclares", language)}</CardTitle></CardHeader><CardContent>
               {analysis.backIngredients.length > 0 ? <div className="flex flex-wrap gap-1.5">{analysis.backIngredients.map((ing, i) => (<span key={i} className="inline-flex items-center rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">{ing}{analysis.backIngredientPercentages[ing] && <span className="ml-1.5 text-primary font-semibold">{analysis.backIngredientPercentages[ing]}</span>}</span>))}</div> : <p className="text-sm text-muted-foreground">{t("error.unreadable", language)}</p>}
             </CardContent></Card>
