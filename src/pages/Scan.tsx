@@ -54,6 +54,7 @@ export default function Scan() {
   const [profileCategory, setProfileCategory] = useState<ProfileCategory>("general");
   const [language, setLanguage] = useState<Language>("en");
   const [scanId, setScanId] = useState<string | null>(null);
+  const [scanDate, setScanDate] = useState<number | null>(null);
   const frontInputRef = useRef<HTMLInputElement>(null);
   const backInputRef = useRef<HTMLInputElement>(null);
 
@@ -61,6 +62,7 @@ export default function Scan() {
     if (pastScan && pastScan.status === "completed" && pastScan.analysis) {
       setAnalysis(pastScan.analysis as unknown as ScanAnalysis);
       setScanId(pastScan._id);
+      setScanDate(pastScan.completedAt ?? pastScan.createdAt);
       if (pastScan.profileCategory) setProfileCategory(pastScan.profileCategory as ProfileCategory);
       if (pastScan.language) setLanguage(pastScan.language as Language);
       setStep("results");
@@ -114,7 +116,7 @@ export default function Scan() {
         backImageUrl: backDataUrl,
         profileCategory,
       });
-      setProgress(100); setAnalysis(result as unknown as ScanAnalysis); setStep("results");
+      setProgress(100); setAnalysis(result as unknown as ScanAnalysis); setScanDate(Date.now()); setStep("results");
     } catch (err) {
       console.error("Scan failed:", err);
       const msg = err instanceof Error ? err.message : "Scan failed. Please try again.";
@@ -132,7 +134,7 @@ export default function Scan() {
 
   const handleReset = () => {
     setFrontImage(null); setBackImage(null); setFrontPreview(null); setBackPreview(null);
-    setAnalysis(null); setError(null); setProgress(0); setLoadingStep(0); setScanId(null); setStep("upload");
+    setAnalysis(null); setError(null); setProgress(0); setLoadingStep(0); setScanId(null); setScanDate(null); setStep("upload");
   };
 
   const handleSignOut = async () => { await signOut(); navigate("/"); };
@@ -246,6 +248,7 @@ export default function Scan() {
                 {analysis.productName && <p className="mt-1 text-lg font-medium">{analysis.productName}</p>}
                 <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                   {scanId && <span>{t("result.scanId", language)}: {scanId.slice(0, 20)}...</span>}
+                  {scanDate && <span>{t("result.date", language)}: {formatDate(scanDate)}</span>}
                   <span>{t("result.profile", language)}: {PROFILE_LABELS[profileCategory]?.[language] ?? profileCategory}</span>
                   <span>{t("result.language", language)}: {LANGUAGE_LABELS[language]}</span>
                 </div>

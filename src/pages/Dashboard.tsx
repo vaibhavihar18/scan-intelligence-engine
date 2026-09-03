@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useNavigate } from "react-router";
@@ -15,13 +16,16 @@ import {
   AlertTriangle,
   CheckCircle,
   User,
+  Globe,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { t, LANGUAGE_LABELS, type Language } from "@/lib/i18n";
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const scans = useQuery(api.scanSessions.listUserScans);
+  const [language, setLanguage] = useState<Language>("en");
 
   const handleSignOut = async () => {
     await signOut();
@@ -29,8 +33,8 @@ export default function Dashboard() {
   };
 
   const scoreColor = (score: number) => {
-    if (score >= 70) return "text-green-600";
-    if (score >= 40) return "text-amber-600";
+    if (score >= 7) return "text-green-600";
+    if (score >= 4) return "text-amber-600";
     return "text-red-600";
   };
 
@@ -40,21 +44,21 @@ export default function Dashboard() {
         return (
           <Badge variant="default" className="text-[10px]">
             <CheckCircle className="mr-1 size-3" />
-            Completed
+            {t("dashboard.completed", language)}
           </Badge>
         );
       case "analyzing":
         return (
           <Badge variant="secondary" className="text-[10px]">
             <Clock className="mr-1 size-3" />
-            Analyzing
+            {t("dashboard.analyzing", language)}
           </Badge>
         );
       case "failed":
         return (
           <Badge variant="destructive" className="text-[10px]">
             <AlertTriangle className="mr-1 size-3" />
-            Failed
+            {t("dashboard.failed", language)}
           </Badge>
         );
       default:
@@ -93,7 +97,11 @@ export default function Dashboard() {
               AHAR <span className="text-primary">X</span>
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {(Object.entries(LANGUAGE_LABELS) as [Language, string][]).map(([code, label]) => (
+              <Button key={code} variant={language === code ? "default" : "ghost"} size="sm" onClick={() => setLanguage(code)} className="text-xs gap-1 hidden sm:inline-flex">{label}</Button>
+            ))}
+            <Button variant="ghost" size="icon" className="sm:hidden" onClick={() => setLanguage(language === "en" ? "mr" : language === "mr" ? "hi" : "en")}><Globe className="size-4" /></Button>
             <Button
               variant="ghost"
               size="sm"
@@ -101,7 +109,7 @@ export default function Dashboard() {
               className="gap-2"
             >
               <User className="size-4" />
-              Profile
+              {t("nav.profile", language)}
             </Button>
             <span className="text-xs text-muted-foreground hidden sm:block">
               {user?.name ?? user?.email ?? "User"}
@@ -122,10 +130,10 @@ export default function Dashboard() {
         >
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              Scan History
+              {t("dashboard.title", language)}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Your recent food label analyses
+              {t("dashboard.subtitle", language)}
             </p>
           </div>
           <Button
@@ -133,7 +141,7 @@ export default function Dashboard() {
             className="gap-2 ahar-gradient text-white hover:opacity-90"
           >
             <Camera className="size-4" />
-            New Scan
+            {t("nav.scan", language)}
           </Button>
         </motion.div>
 
@@ -142,7 +150,7 @@ export default function Dashboard() {
           {scans === undefined ? (
             <div className="flex items-center justify-center py-20">
               <div className="animate-pulse text-muted-foreground text-sm">
-                Loading scans...
+                {t("dashboard.loading", language)}
               </div>
             </div>
           ) : scans.length === 0 ? (
@@ -154,17 +162,16 @@ export default function Dashboard() {
               <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
                 <ScanLine className="size-8" />
               </div>
-              <h2 className="text-lg font-semibold">No scans yet</h2>
+              <h2 className="text-lg font-semibold">{t("dashboard.noScans", language)}</h2>
               <p className="mt-2 text-sm text-muted-foreground text-center max-w-sm">
-                Upload front and back images of any food product to get your
-                first AHAR X analysis.
+                {t("dashboard.noScansDesc", language)}
               </p>
               <Button
                 onClick={() => navigate("/scan")}
                 className="mt-6 gap-2 ahar-gradient text-white hover:opacity-90"
               >
                 <Camera className="size-4" />
-                Scan Your First Product
+                {t("dashboard.firstScan", language)}
               </Button>
             </motion.div>
           ) : (
@@ -198,7 +205,7 @@ export default function Dashboard() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium truncate">
-                            {scan.productName ?? "Unknown Product"}
+                            {scan.productName ?? t("dashboard.unknownProduct", language)}
                           </p>
                           {statusBadge(scan.status)}
                         </div>
@@ -216,7 +223,7 @@ export default function Dashboard() {
                                 {scan.analysis.aharScore.overall}
                               </span>
                               <span className="text-[10px] text-muted-foreground">
-                                /100
+                                / 10
                               </span>
                             </div>
                             <div className="flex gap-1.5">
@@ -225,18 +232,12 @@ export default function Dashboard() {
                                   variant="destructive"
                                   className="text-[9px]"
                                 >
-                                  {scan.analysis.allergens.length} allergen
-                                  {scan.analysis.allergens.length !== 1
-                                    ? "s"
-                                    : ""}
+                                  {scan.analysis.allergens.length} {scan.analysis.allergens.length !== 1 ? t("dashboard.allergens", language) : t("dashboard.allergen", language)}
                                 </Badge>
                               )}
                               {scan.analysis.frontClaims.length > 0 && (
                                 <Badge variant="secondary" className="text-[9px]">
-                                  {scan.analysis.frontClaims.length} claim
-                                  {scan.analysis.frontClaims.length !== 1
-                                    ? "s"
-                                    : ""}
+                                  {scan.analysis.frontClaims.length} {scan.analysis.frontClaims.length !== 1 ? t("dashboard.claims", language) : t("dashboard.claim", language)}
                                 </Badge>
                               )}
                             </div>

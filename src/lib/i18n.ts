@@ -203,6 +203,22 @@ const translations: Record<string, Record<Language, string>> = {
   "fssai.compliant": { en: "Compliant", mr: "अनुरूप", hi: "अनुपालन" },
   "fssai.nonCompliant": { en: "Non-compliant", mr: "अनुरूप नाही", hi: "अनुपालन नहीं" },
   "fssai.insufficient": { en: "Insufficient evidence", mr: "अपुरा पुरावा", hi: "अपर्याप्त सबूत" },
+
+  // Dashboard
+  "dashboard.title": { en: "Scan History", mr: "स्कॅन इतिहास", hi: "स्कैन इतिहास" },
+  "dashboard.subtitle": { en: "Your recent food label analyses", mr: "तुमचे अलीकडील अन्न लेबल विश्लेषण", hi: "आपके हालिया खाद्य लेबल विश्लेषण" },
+  "dashboard.noScans": { en: "No scans yet", mr: "अद्याप स्कॅन नाही", hi: "अभी तक कोई स्कैन नहीं" },
+  "dashboard.noScansDesc": { en: "Upload front and back images of any food product to get your first AHAR X analysis.", mr: "तुमचे पहिले AHAR X विश्लेषण मिळवण्यासाठी कोणत्याही अन्न उत्पादनाचे समोर आणि माग प्रतिमा अपलोड करा.", hi: "अपना पहला AHAR X विश्लेषण प्राप्त करने के लिए किसी भी खाद्य उत्पादन के सामने और पीछे के चित्र अपलोड करें।" },
+  "dashboard.firstScan": { en: "Scan Your First Product", mr: "तुमचे पहिले उत्पादन स्कॅन करा", hi: "अपना पहला उत्पादन स्कैन करें" },
+  "dashboard.loading": { en: "Loading scans...", mr: "स्कॅन लोड होत आहेत...", hi: "स्कैन लोड हो रहे हैं..." },
+  "dashboard.unknownProduct": { en: "Unknown Product", mr: "अज्ञात उत्पादन", hi: "अज्ञात उत्पादन" },
+  "dashboard.completed": { en: "Completed", mr: "पूर्ण", hi: "पूर्ण" },
+  "dashboard.analyzing": { en: "Analyzing", mr: "विश्लेषण होत आहे", hi: "विश्लेषण हो रहा है" },
+  "dashboard.failed": { en: "Failed", mr: "अयशस्वी", hi: "विफल" },
+  "dashboard.allergen": { en: "allergen", mr: "अॅलर्जेन", hi: "एलर्जन" },
+  "dashboard.allergens": { en: "allergens", mr: "अॅलर्जेन्स", hi: "एलर्जन" },
+  "dashboard.claim": { en: "claim", mr: "दावा", hi: "दावा" },
+  "dashboard.claims": { en: "claims", mr: "दावे", hi: "दावे" },
 };
 
 export function t(key: string, lang: Language = "en"): string {
