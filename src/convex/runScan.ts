@@ -60,7 +60,15 @@ export const runFullScan = action({
     });
 
     try {
-      // 2. Run AI vision analysis
+      // 2. Read user profile for personalized scoring
+      let userProfile = null;
+      try {
+        userProfile = await ctx.runQuery(api.userProfiles.getProfile);
+      } catch {
+        // Profile may not exist yet — use defaults
+      }
+
+      // 3. Run AI vision analysis
       const aiResult: AiResult = await ctx.runAction(
         api.analyzeLabel.analyzeImages,
         {
@@ -114,7 +122,7 @@ export const runFullScan = action({
         confidence.backOverall,
       );
 
-      // 6. Calculate AHAR X score
+      // 6. Calculate AHAR X score (personalized with user profile)
       const aharScore = calculateAharScore(
         front.claims ?? [],
         front.highlightedIngredients ?? [],
@@ -127,6 +135,7 @@ export const runFullScan = action({
           ...(front.allergens ?? []),
           ...(back.allergens ?? []),
         ],
+        userProfile ?? undefined,
       );
 
       // 7. Generate report
@@ -161,14 +170,14 @@ export const runFullScan = action({
         report,
       };
 
-      // 9. Save results
+      // 10. Save results
       await ctx.runMutation(api.scanSessions.saveAnalysis, {
         docId: args.docId,
         productName: front.productName ?? undefined,
         analysis,
       });
 
-      // 10. Save evidence trail
+      // 11. Save evidence trail
       const evidenceItems = [
         // Front evidence
         ...(front.claims ?? []).map((claim) => ({

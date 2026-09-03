@@ -319,6 +319,15 @@ export function evaluateFSSAIRules(
 
 // --- AHAR X Score Calculation ---
 
+export interface UserProfile {
+  dietaryGoal: string;
+  allergies: string[];
+  maxCaloriesPerServing?: number | null;
+  avoidAddedSugar: boolean;
+  avoidTransFat: boolean;
+  preferHighFibre: boolean;
+}
+
 export function calculateAharScore(
   frontClaims: string[],
   frontIngredients: string[],
@@ -328,6 +337,7 @@ export function calculateAharScore(
   ingredientVerifications: IngredientVerification[],
   fssaiEvaluations: FSSAIEvaluation[],
   allergens: string[],
+  userProfile?: UserProfile,
 ): AharScore {
   // 1. Label Transparency (0-100)
   let transparency = 50; // baseline
@@ -416,10 +426,93 @@ export function calculateAharScore(
       claimScore * 0.2,
   );
 
+  // --- Personalized scoring adjustments based on user profile ---
+  let adjustedOverall = overall;
+  let adjustedNutrition = nutritionScore;
+
+  if (userProfile) {
+    // Allergy penalty: if allergens match user's allergies, penalize
+    const allergyMatches = allergens.filter((a) =>
+      userProfile.allergies.some(
+        (ua) => ua.toLowerCase() === a.toLowerCase(),
+      ),
+    );
+    if (allergyMatches.length > 0) {
+      adjustedNutrition -= allergyMatches.length * 15;
+      adjustedOverall -= allergyMatches.length * 10;
+    }
+
+    // Avoid added sugar: penalize if sugars are high
+    if (userProfile.avoidAddedSugar && nutrition.sugars !== null && nutrition.sugars > 15) {
+      adjustedNutrition -= 10;
+      adjustedOverall -= 5;
+    }
+
+    // Avoid trans fat: penalize if trans fat present
+    if (userProfile.avoidTransFat && nutrition.transFat !== null && nutrition.transFat > 0) {
+      adjustedNutrition -= 12;
+      adjustedOverall -= 8;
+    }
+
+    // Prefer high fibre: boost if fibre is high
+    if (userProfile.preferHighFibre && nutrition.fibre !== null && nutrition.fibre >= 6) {
+      adjustedNutrition += 5;
+      adjustedOverall += 3;
+    }
+
+    // Max calories per serving: penalize if exceeded
+    if (userProfile.maxCaloriesPerServing && nutrition.calories !== null) {
+      if (nutrition.calories > userProfile.maxCaloriesPerServing) {
+        adjustedNutrition -= 8;
+        adjustedOverall -= 5;
+      }
+    }
+
+    // Diet-specific adjustments
+    if (userProfile.dietaryGoal === "diabetic") {
+      if (nutrition.sugars !== null && nutrition.sugars > 10) {
+        adjustedNutrition -= 8;
+        adjustedOverall -= 4;
+      }
+      if (nutrition.carbohydrates !== null && nutrition.carbohydrates > 30) {
+        adjustedNutrition -= 5;
+        adjustedOverall -= 3;
+      }
+    }
+
+    if (userProfile.dietaryGoal === "heart_healthy") {
+      if (nutrition.sodium !== null && nutrition.sodium > 400) {
+        adjustedNutrition -= 8;
+        adjustedOverall -= 4;
+      }
+      if (nutrition.saturatedFat !== null && nutrition.saturatedFat > 8) {
+        adjustedNutrition -= 8;
+        adjustedOverall -= 4;
+      }
+    }
+
+    if (userProfile.dietaryGoal === "low_sodium") {
+      if (nutrition.sodium !== null && nutrition.sodium > 120) {
+        adjustedNutrition -= 10;
+        adjustedOverall -= 5;
+      }
+    }
+
+    if (userProfile.dietaryGoal === "high_protein") {
+      if (nutrition.protein !== null && nutrition.protein >= 10) {
+        adjustedNutrition += 8;
+        adjustedOverall += 4;
+      } else if (nutrition.protein !== null && nutrition.protein < 5) {
+        adjustedNutrition -= 5;
+        adjustedOverall -= 3;
+      }
+    }
+  }
+
   return {
-    overall: Math.max(0, Math.min(100, overall)),
+    overall: Math.max(0, Math.min(100, adjustedOverall)),
     labelTransparency: Math.max(0, Math.min(100, transparency)),
-    nutritionQuality: Math.max(0, Math.min(100, nutritionScore)),
+    nutritionQuality: Math.max(0, Math.min(100, adjustedNutrition)),
     ingredientIntegrity: Math.max(0, Math.min(100, integrity)),
     claimAccuracy: Math.max(0, Math.min(100, claimScore)),
   };

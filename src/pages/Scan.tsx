@@ -1,8 +1,8 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { useMutation, useAction } from "convex/react";
+import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,9 +21,11 @@ import {
   ChevronRight,
   History,
   LogOut,
+  User,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import type { ScanAnalysis } from "@/types/ahar";
+import type { Doc } from "@/convex/_generated/dataModel";
 
 type Step = "upload" | "analyzing" | "results";
 
@@ -33,6 +35,13 @@ export default function Scan() {
   const createScanSession = useMutation(api.scanSessions.createScanSession);
   const runFullScan = useAction(api.runScan.runFullScan);
 
+  const location = useLocation();
+  const scanFromNav = (location.state as { scanId?: string } | null)?.scanId;
+  const pastScan = useQuery(
+    api.scanSessions.getScan,
+    scanFromNav ? { docId: scanFromNav as Doc<"scanSessions">["_id"] } : "skip",
+  );
+
   const [step, setStep] = useState<Step>("upload");
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
@@ -41,6 +50,14 @@ export default function Scan() {
   const [analysis, setAnalysis] = useState<ScanAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+
+  // If navigated with a past scan, show its results directly
+  useEffect(() => {
+    if (pastScan && pastScan.status === "completed" && pastScan.analysis) {
+      setAnalysis(pastScan.analysis as unknown as ScanAnalysis);
+      setStep("results");
+    }
+  }, [pastScan]);
 
   const frontInputRef = useRef<HTMLInputElement>(null);
   const backInputRef = useRef<HTMLInputElement>(null);
@@ -220,6 +237,15 @@ export default function Scan() {
             >
               <History className="size-4" />
               History
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/profile")}
+              className="gap-2"
+            >
+              <User className="size-4" />
+              Profile
             </Button>
             <span className="text-xs text-muted-foreground hidden sm:block">
               {user?.name ?? user?.email ?? "User"}

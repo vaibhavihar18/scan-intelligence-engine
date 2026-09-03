@@ -14,6 +14,7 @@ import {
   BarChart3,
   AlertTriangle,
   CheckCircle,
+  User,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -93,6 +94,15 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/profile")}
+              className="gap-2"
+            >
+              <User className="size-4" />
+              Profile
+            </Button>
             <span className="text-xs text-muted-foreground hidden sm:block">
               {user?.name ?? user?.email ?? "User"}
             </span>
