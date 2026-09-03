@@ -120,9 +120,9 @@ export default function Scan() {
       const msg = err instanceof Error ? err.message : "Scan failed. Please try again.";
       // Provide specific error guidance
       if (msg.includes("OPENAI_API_KEY")) {
-        setError("Analysis service is not configured. Please add an OpenAI API key in the project settings.");
+        setError("OPENAI_API_KEY is not configured on the backend. Run: npx convex env set OPENAI_API_KEY=your-key");
       } else if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-        setError("Unable to connect to the analysis service. Please check your connection.");
+        setError("Unable to connect to the analysis service. Please check your internet connection.");
       } else {
         setError(msg);
       }

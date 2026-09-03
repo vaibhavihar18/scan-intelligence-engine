@@ -66,6 +66,11 @@ export const runFullScan = action({
     )),
   },
   handler: async (ctx, args): Promise<Record<string, unknown>> => {
+    console.log("[AHAR X] runFullScan called");
+    console.log("[AHAR X] frontImageUrl type:", typeof args.frontImageUrl, "length:", args.frontImageUrl?.length);
+    console.log("[AHAR X] backImageUrl type:", typeof args.backImageUrl, "length:", args.backImageUrl?.length);
+    console.log("[AHAR X] profileCategory:", args.profileCategory);
+
     // 1. Update status to analyzing
     await ctx.runMutation(api.scanSessions.updateStatus, {
       docId: args.docId,
@@ -74,6 +79,7 @@ export const runFullScan = action({
 
     try {
       // 2. Run AI vision analysis
+      console.log("[AHAR X] Calling analyzeImages...");
       const aiResult: AiResult = await ctx.runAction(
         api.analyzeLabel.analyzeImages,
         {
@@ -142,6 +148,12 @@ export const runFullScan = action({
       );
 
       // 8. Assess profile suitability
+      console.log("[AHAR X] AI analysis complete, building results...");
+      console.log("[AHAR X] Product:", front.productName);
+      console.log("[AHAR X] Front claims:", front.claims?.length);
+      console.log("[AHAR X] Back ingredients:", back.ingredients?.length);
+      console.log("[AHAR X] Verification results:", ingredientVerifications.length);
+
       const suitability = assessSuitability(
         nutrition,
         allAllergens,

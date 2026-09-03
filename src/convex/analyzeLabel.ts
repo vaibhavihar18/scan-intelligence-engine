@@ -11,10 +11,18 @@ export const analyzeImages = action({
     scanSessionId: v.string(),
   },
   handler: async (ctx, args) => {
+    console.log("[AHAR X] analyzeImages called");
+    console.log("[AHAR X] Front image URL length:", args.frontImageUrl?.length);
+    console.log("[AHAR X] Back image URL length:", args.backImageUrl?.length);
+    console.log("[AHAR X] OPENAI_API_KEY present:", !!process.env.OPENAI_API_KEY);
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new Error(
-        "OPENAI_API_KEY not configured. Please add it in your project's Keys/API keys tab.",
+        "OPENAI_API_KEY environment variable is not set on the Convex backend. " +
+        "To configure it, run: npx convex env set OPENAI_API_KEY=your-api-key-here " +
+        "OR set it in the Convex dashboard under Settings > Environment Variables. " +
+        "You need an OpenAI API key with GPT-4o vision access.",
       );
     }
 
@@ -118,11 +126,13 @@ Respond with ONLY the JSON object. No markdown formatting, no explanation.`;
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error("[AHAR X] OpenAI API error:", response.status, errorText);
       throw new Error(`OpenAI API error (${response.status}): ${errorText}`);
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
+    console.log("[AHAR X] OpenAI response received, content length:", content?.length ?? 0);
 
     if (!content) {
       throw new Error("No analysis content returned from OpenAI");
