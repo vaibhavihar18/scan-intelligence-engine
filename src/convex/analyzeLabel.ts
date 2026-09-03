@@ -3,7 +3,10 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 
-// AI vision analysis of food package images using OpenAI GPT-4o
+// VLY Integration Gateway — OpenAI-compatible endpoint
+const VLY_GATEWAY_URL = "https://integrations.vly.ai/v1/llm/chat/completions";
+
+// AI vision analysis of food package images
 export const analyzeImages = action({
   args: {
     frontImageUrl: v.string(),
@@ -11,18 +14,13 @@ export const analyzeImages = action({
     scanSessionId: v.string(),
   },
   handler: async (ctx, args) => {
-    console.log("[AHAR X] analyzeImages called");
-    console.log("[AHAR X] Front image URL length:", args.frontImageUrl?.length);
-    console.log("[AHAR X] Back image URL length:", args.backImageUrl?.length);
-    console.log("[AHAR X] OPENAI_API_KEY present:", !!process.env.OPENAI_API_KEY);
+    const apiKey = process.env.VLY_INTEGRATION_KEY;
 
-    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new Error(
-        "OPENAI_API_KEY environment variable is not set on the Convex backend. " +
-        "To configure it, run: npx convex env set OPENAI_API_KEY=your-api-key-here " +
-        "OR set it in the Convex dashboard under Settings > Environment Variables. " +
-        "You need an OpenAI API key with GPT-4o vision access.",
+        "AI analysis service is not configured. " +
+          "VLY_INTEGRATION_KEY is not set in the Convex backend environment variables. " +
+          "Please configure it in the Convex dashboard under Settings > Environment Variables.",
       );
     }
 
@@ -41,6 +39,7 @@ CRITICAL RULES:
 - Extract ALL allergen declarations (e.g., "Contains: Milk, Soy", "May contain traces of nuts").
 - Extract ALL qualifying statements (e.g., "Approximately", "May contain", "Best before").
 - Extract ALL footnotes and disclaimers visible on the back label.
+- For front-of-pack claims, detect terms like: High Protein, Low Sugar, Sugar Free, No Added Sugar, Low Fat, Fat Free, High Fibre, Source of Protein, Natural, Pure, Made With, Contains, and any ingredient prominently highlighted (e.g., "HAZELNUT", "ALMOND", "SAFFRON").
 
 Return a JSON object with this EXACT structure:
 
@@ -89,7 +88,31 @@ Return a JSON object with this EXACT structure:
 
 Respond with ONLY the JSON object. No markdown formatting, no explanation.`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    // Build multimodal messages with base64 data URL images
+    const messages = [
+      {
+        role: "user" as const,
+        content: [
+          { type: "text" as const, text: prompt },
+          {
+            type: "image_url" as const,
+            image_url: {
+              url: args.frontImageUrl,
+              detail: "high" as const,
+            },
+          },
+          {
+            type: "image_url" as const,
+            image_url: {
+              url: args.backImageUrl,
+              detail: "high" as const,
+            },
+          },
+        ],
+      },
+    ];
+
+    const response = await fetch(VLY_GATEWAY_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -99,46 +122,27 @@ Respond with ONLY the JSON object. No markdown formatting, no explanation.`;
         model: "gpt-4o",
         max_tokens: 4000,
         temperature: 0.1,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              {
-                type: "image_url",
-                image_url: {
-                  url: args.frontImageUrl,
-                  detail: "high",
-                },
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: args.backImageUrl,
-                  detail: "high",
-                },
-              },
-            ],
-          },
-        ],
+        messages,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[AHAR X] OpenAI API error:", response.status, errorText);
-      throw new Error(`OpenAI API error (${response.status}): ${errorText}`);
+      throw new Error(
+        `AI analysis service error (${response.status}): ${errorText.slice(0, 300)}`,
+      );
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
-    console.log("[AHAR X] OpenAI response received, content length:", content?.length ?? 0);
 
     if (!content) {
-      throw new Error("No analysis content returned from OpenAI");
+      throw new Error(
+        "AI analysis service returned no content. The images may be too large or unreadable.",
+      );
     }
 
-    // Parse the JSON response
+    // Parse the JSON response from the AI
     try {
       const cleaned = content.replace(/```json\n?|\n?```/g, "").trim();
       const parsed = JSON.parse(cleaned);
@@ -149,18 +153,8 @@ Respond with ONLY the JSON object. No markdown formatting, no explanation.`;
       };
     } catch {
       throw new Error(
-        `Failed to parse AI response. Raw content: ${content.slice(0, 500)}`,
+        `Failed to parse AI response as structured data. The AI may have returned an unexpected format. Raw content: ${content.slice(0, 500)}`,
       );
     }
-  },
-});
-
-// Convert a Convex storage ID to a data URL for OpenAI
-export const getStorageUrl = action({
-  args: { storageId: v.string() },
-  handler: async (ctx, args) => {
-    const url = await ctx.storage.getUrl(args.storageId);
-    if (!url) throw new Error("Storage file not found");
-    return url;
   },
 });

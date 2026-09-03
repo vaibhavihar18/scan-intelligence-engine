@@ -121,10 +121,14 @@ export default function Scan() {
       console.error("Scan failed:", err);
       const msg = err instanceof Error ? err.message : "Scan failed. Please try again.";
       // Provide specific error guidance
-      if (msg.includes("OPENAI_API_KEY")) {
-        setError("OPENAI_API_KEY is not configured on the backend. Run: npx convex env set OPENAI_API_KEY=your-key");
+      if (msg.includes("not configured") || msg.includes("VLY_INTEGRATION_KEY")) {
+        setError("AI analysis service is not configured. Please check that VLY_INTEGRATION_KEY is set in the Convex dashboard under Settings > Environment Variables.");
       } else if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-        setError("Unable to connect to the analysis service. Please check your internet connection.");
+        setError("Unable to connect to the analysis service. Please check your internet connection and try again.");
+      } else if (msg.includes("AI analysis service error")) {
+        setError(msg);
+      } else if (msg.includes("Failed to parse AI response")) {
+        setError("The AI could not produce a structured analysis from the uploaded images. Please try uploading clearer images.");
       } else {
         setError(msg);
       }
