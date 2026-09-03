@@ -6,6 +6,19 @@ export const createScanSession = mutation({
   args: {
     frontImageId: v.string(),
     backImageId: v.string(),
+    profileCategory: v.optional(v.union(
+      v.literal("general"),
+      v.literal("child"),
+      v.literal("fitness"),
+      v.literal("weight"),
+      v.literal("vegetarian"),
+      v.literal("highProtein"),
+    )),
+    language: v.optional(v.union(
+      v.literal("en"),
+      v.literal("mr"),
+      v.literal("hi"),
+    )),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -19,6 +32,8 @@ export const createScanSession = mutation({
       frontImageId: args.frontImageId,
       backImageId: args.backImageId,
       status: "uploaded",
+      profileCategory: args.profileCategory ?? "general",
+      language: args.language ?? "en",
       createdAt: now,
     });
 

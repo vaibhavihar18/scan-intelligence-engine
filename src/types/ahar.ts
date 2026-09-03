@@ -12,6 +12,16 @@ export type ScanStatus =
   | "completed"
   | "failed";
 
+export type ProfileCategory =
+  | "general"
+  | "child"
+  | "fitness"
+  | "weight"
+  | "vegetarian"
+  | "highProtein";
+
+export type LanguageCode = "en" | "mr" | "hi";
+
 // --- Evidence provenance ---
 
 export interface Evidence {
@@ -34,6 +44,7 @@ export interface IngredientVerification {
     | "percentage_not_stated"
     | "potential_inconsistency"
     | "insufficient_evidence";
+  confidence: Confidence;
 }
 
 // --- Nutrition values (from label extraction) ---
@@ -68,14 +79,26 @@ export interface FSSAIEvaluation {
   detail: string;
 }
 
-// --- AHAR X Score ---
+// --- Profile suitability assessment ---
+
+export interface SuitabilityAssessment {
+  profile: ProfileCategory;
+  status: "suitable" | "use_caution" | "not_recommended" | "insufficient_evidence";
+  reasons: string[];
+}
+
+// --- AHAR X Score (5-point scale) ---
 
 export interface AharScore {
-  overall: number; // 0-100
-  labelTransparency: number;
-  nutritionQuality: number;
-  ingredientIntegrity: number;
-  claimAccuracy: number;
+  overall: number; // 0-10, one decimal
+  factors: ScoreFactor[];
+}
+
+export interface ScoreFactor {
+  label: string;
+  value: string;
+  impact: "positive" | "negative" | "neutral" | "unavailable";
+  delta: number;
 }
 
 // --- Complete analysis result for a scan session ---
@@ -89,27 +112,20 @@ export interface ScanAnalysis {
   allergens: string[];
   qualifiers: string[];
   footnotes: string[];
+  vegetarianDeclaration: string | null;
   nutrition: NutritionData;
   ingredientVerifications: IngredientVerification[];
   fssaiEvaluations: FSSAIEvaluation[];
+  suitability: SuitabilityAssessment[];
   aharScore: AharScore;
-  report: string;
+  simpleExplanation: string;
+  limitations: string[];
 }
 
 // --- User profile for personalized scoring ---
 
-export type DietaryGoal =
-  | "general_healthy"
-  | "weight_loss"
-  | "weight_gain"
-  | "diabetic"
-  | "heart_healthy"
-  | "high_protein"
-  | "low_sodium"
-  | "child_friendly";
-
 export interface UserProfile {
-  dietaryGoal: DietaryGoal;
+  dietaryGoal: string;
   allergies: string[];
   maxCaloriesPerServing: number | null;
   avoidAddedSugar: boolean;
@@ -126,6 +142,8 @@ export interface ScanSession {
   backImageId: string;
   status: ScanStatus;
   productName: string | null;
+  profileCategory: ProfileCategory | null;
+  language: LanguageCode;
   analysis: ScanAnalysis | null;
   createdAt: number;
   completedAt: number | null;

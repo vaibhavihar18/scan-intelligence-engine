@@ -23,6 +23,21 @@ const scanStatusValidator = v.union(
   v.literal("failed"),
 );
 
+const profileCategoryValidator = v.union(
+  v.literal("general"),
+  v.literal("child"),
+  v.literal("fitness"),
+  v.literal("weight"),
+  v.literal("vegetarian"),
+  v.literal("highProtein"),
+);
+
+const languageValidator = v.union(
+  v.literal("en"),
+  v.literal("mr"),
+  v.literal("hi"),
+);
+
 const evidenceValidator = v.object({
   scanSessionId: v.string(),
   sourceSide: sourceSideValidator,
@@ -42,6 +57,7 @@ const ingredientVerificationValidator = v.object({
     v.literal("potential_inconsistency"),
     v.literal("insufficient_evidence"),
   ),
+  confidence: confidenceValidator,
 });
 
 const nutritionDataValidator = v.object({
@@ -81,12 +97,32 @@ const fssaiEvaluationValidator = v.object({
   detail: v.string(),
 });
 
+const suitabilityAssessmentValidator = v.object({
+  profile: profileCategoryValidator,
+  status: v.union(
+    v.literal("suitable"),
+    v.literal("use_caution"),
+    v.literal("not_recommended"),
+    v.literal("insufficient_evidence"),
+  ),
+  reasons: v.array(v.string()),
+});
+
+const scoreFactorValidator = v.object({
+  label: v.string(),
+  value: v.string(),
+  impact: v.union(
+    v.literal("positive"),
+    v.literal("negative"),
+    v.literal("neutral"),
+    v.literal("unavailable"),
+  ),
+  delta: v.number(),
+});
+
 const aharScoreValidator = v.object({
   overall: v.number(),
-  labelTransparency: v.number(),
-  nutritionQuality: v.number(),
-  ingredientIntegrity: v.number(),
-  claimAccuracy: v.number(),
+  factors: v.array(scoreFactorValidator),
 });
 
 const scanAnalysisValidator = v.object({
@@ -98,26 +134,18 @@ const scanAnalysisValidator = v.object({
   allergens: v.array(v.string()),
   qualifiers: v.array(v.string()),
   footnotes: v.array(v.string()),
+  vegetarianDeclaration: v.optional(v.string()),
   nutrition: nutritionDataValidator,
   ingredientVerifications: v.array(ingredientVerificationValidator),
   fssaiEvaluations: v.array(fssaiEvaluationValidator),
+  suitability: v.array(suitabilityAssessmentValidator),
   aharScore: aharScoreValidator,
-  report: v.string(),
+  simpleExplanation: v.string(),
+  limitations: v.array(v.string()),
 });
 
-const dietaryGoalValidator = v.union(
-  v.literal("general_healthy"),
-  v.literal("weight_loss"),
-  v.literal("weight_gain"),
-  v.literal("diabetic"),
-  v.literal("heart_healthy"),
-  v.literal("high_protein"),
-  v.literal("low_sodium"),
-  v.literal("child_friendly"),
-);
-
 const userProfileValidator = v.object({
-  dietaryGoal: dietaryGoalValidator,
+  dietaryGoal: v.string(),
   allergies: v.array(v.string()),
   maxCaloriesPerServing: v.optional(v.number()),
   avoidAddedSugar: v.boolean(),
@@ -148,6 +176,8 @@ const schema = defineSchema(
       backImageId: v.string(),
       status: scanStatusValidator,
       productName: v.optional(v.string()),
+      profileCategory: v.optional(profileCategoryValidator),
+      language: v.optional(languageValidator),
       analysis: v.optional(scanAnalysisValidator),
       createdAt: v.number(),
       completedAt: v.optional(v.number()),

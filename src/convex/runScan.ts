@@ -5,9 +5,9 @@ import {
   verifyIngredients,
   evaluateFSSAIRules,
   calculateAharScore,
-  generateReport,
-  type NutritionData,
+  assessSuitability,
 } from "./scoring";
+import type { ProfileCategory, NutritionData } from "../types/ahar";
 
 type AiResult = {
   frontAnalysis: {
@@ -16,6 +16,7 @@ type AiResult = {
     highlightedIngredients: string[];
     allergens: string[];
     otherText: string[];
+    vegetarianSymbol: string | null;
   };
   backAnalysis: {
     ingredientsList: string;
@@ -41,6 +42,8 @@ type AiResult = {
   extractionConfidence: {
     frontOverall: "HIGH" | "MEDIUM" | "LOW";
     backOverall: "HIGH" | "MEDIUM" | "LOW";
+    frontNotes: string;
+    backNotes: string;
   };
 };
 
@@ -51,6 +54,14 @@ export const runFullScan = action({
     scanSessionId: v.string(),
     frontImageUrl: v.string(),
     backImageUrl: v.string(),
+    profileCategory: v.optional(v.union(
+      v.literal("general"),
+      v.literal("child"),
+      v.literal("fitness"),
+      v.literal("weight"),
+      v.literal("vegetarian"),
+      v.literal("highProtein"),
+    )),
   },
   handler: async (ctx, args): Promise<Record<string, unknown>> => {
     // 1. Update status to analyzing
@@ -60,15 +71,7 @@ export const runFullScan = action({
     });
 
     try {
-      // 2. Read user profile for personalized scoring
-      let userProfile = null;
-      try {
-        userProfile = await ctx.runQuery(api.userProfiles.getProfile);
-      } catch {
-        // Profile may not exist yet — use defaults
-      }
-
-      // 3. Run AI vision analysis
+      // 2. Run AI vision analysis
       const aiResult: AiResult = await ctx.runAction(
         api.analyzeLabel.analyzeImages,
         {
@@ -107,79 +110,119 @@ export const runFullScan = action({
       );
 
       // 5. Run FSSAI rule engine
+      const allAllergens = [
+        ...new Set([
+          ...(front.allergens ?? []),
+          ...(back.allergens ?? []),
+        ]),
+      ];
+
       const fssaiEvaluations = evaluateFSSAIRules(
         front.claims ?? [],
-        front.highlightedIngredients ?? [],
         back.ingredients ?? [],
         back.ingredientPercentages ?? {},
         nutrition,
-        [
-          ...(front.allergens ?? []),
-          ...(back.allergens ?? []),
-        ],
+        allAllergens,
         back.qualifiers ?? [],
         confidence.frontOverall,
         confidence.backOverall,
       );
 
-      // 6. Calculate AHAR X score (personalized with user profile)
+      // 6. Determine profile category
+      const profileCategory: ProfileCategory = (args.profileCategory as ProfileCategory) ?? "general";
+
+      // 7. Calculate AHAR X score
       const aharScore = calculateAharScore(
-        front.claims ?? [],
-        front.highlightedIngredients ?? [],
+        nutrition,
+        profileCategory,
+        ingredientVerifications,
+        allAllergens,
+      );
+
+      // 8. Assess profile suitability
+      const suitability = assessSuitability(
+        nutrition,
+        allAllergens,
         back.ingredients ?? [],
-        back.ingredientPercentages ?? {},
-        nutrition,
-        ingredientVerifications,
-        fssaiEvaluations,
-        [
-          ...(front.allergens ?? []),
-          ...(back.allergens ?? []),
-        ],
-        userProfile ?? undefined,
-      );
-
-      // 7. Generate report
-      const report: string = generateReport(
-        front.productName ?? null,
         front.claims ?? [],
-        nutrition,
-        ingredientVerifications,
-        fssaiEvaluations,
-        aharScore,
+        front.vegetarianSymbol ?? null,
       );
 
-      // 8. Build full analysis object
+      // 9. Build limitations
+      const limitations: string[] = [
+        "AHAR X analyzes the manufacturer's declared label information. It does not laboratory-test the product.",
+      ];
+      if (confidence.backOverall === "LOW") {
+        limitations.push(
+          "Some conclusions may be unavailable because the supplied label image could not be read reliably.",
+        );
+      }
+      if (confidence.frontOverall === "LOW") {
+        limitations.push(
+          "Front label image quality is low. Some front claims may not have been captured.",
+        );
+      }
+
+      // 10. Build simple explanation
+      const explanationParts: string[] = [];
+      explanationParts.push(`Product: ${front.productName ?? "Unknown"}`);
+
+      if (nutrition.calories !== null) {
+        explanationParts.push(`Calories: ${nutrition.calories} kcal per serving`);
+      }
+      if (nutrition.protein !== null) {
+        explanationParts.push(`Protein: ${nutrition.protein}g`);
+      }
+      if (nutrition.sugars !== null) {
+        explanationParts.push(`Sugars: ${nutrition.sugars}g`);
+      }
+
+      if (front.claims.length > 0) {
+        explanationParts.push(`Front claims: ${front.claims.join(", ")}`);
+      }
+
+      if (ingredientVerifications.length > 0) {
+        const confirmed = ingredientVerifications.filter((v) => v.status === "match_confirmed");
+        const inconsistent = ingredientVerifications.filter((v) => v.status === "potential_inconsistency");
+        if (confirmed.length > 0) {
+          explanationParts.push(`Verified ingredients: ${confirmed.map((v) => v.ingredient).join(", ")}`);
+        }
+        if (inconsistent.length > 0) {
+          explanationParts.push(`Potential inconsistencies: ${inconsistent.map((v) => v.ingredient).join(", ")}`);
+        }
+      }
+
+      const simpleExplanation = explanationParts.join(". ");
+
+      // 11. Build full analysis object
       const analysis: Record<string, unknown> = {
         productName: front.productName ?? null,
         frontClaims: front.claims ?? [],
         frontHighlightedIngredients: front.highlightedIngredients ?? [],
         backIngredients: back.ingredients ?? [],
         backIngredientPercentages: back.ingredientPercentages ?? {},
-        allergens: [
-          ...new Set([
-            ...(front.allergens ?? []),
-            ...(back.allergens ?? []),
-          ]),
-        ],
+        allergens: allAllergens,
         qualifiers: back.qualifiers ?? [],
         footnotes: back.footnotes ?? [],
+        vegetarianDeclaration: front.vegetarianSymbol ?? null,
         nutrition,
         ingredientVerifications,
         fssaiEvaluations,
+        suitability,
         aharScore,
-        report,
+        simpleExplanation,
+        limitations,
       };
 
-      // 10. Save results
+      // 12. Save results
       await ctx.runMutation(api.scanSessions.saveAnalysis, {
         docId: args.docId,
         productName: front.productName ?? undefined,
         analysis,
       });
 
-      // 11. Save evidence trail
+      // 13. Save evidence trail
       const evidenceItems = [
-        // Front evidence
         ...(front.claims ?? []).map((claim) => ({
           scanSessionId: args.scanSessionId,
           sourceSide: "FRONT" as const,
@@ -194,7 +237,6 @@ export const runFullScan = action({
           normalizedValue: ing.toLowerCase().trim(),
           confidence: (confidence.frontOverall as "HIGH" | "MEDIUM" | "LOW") ?? "MEDIUM",
         })),
-        // Back evidence
         ...(back.ingredients ?? []).map((ing) => ({
           scanSessionId: args.scanSessionId,
           sourceSide: "BACK" as const,
