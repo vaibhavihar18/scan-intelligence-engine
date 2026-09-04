@@ -558,7 +558,169 @@ export default function Scan() {
             </div>
 
             {/* ════════════════════════════════════════════
-                12. EVIDENCE (collapsible)
+                12. CONCERN RADAR
+                ════════════════════════════════════════════ */}
+            {(() => {
+              const concerns: { icon: string; label: string; detail: string; level: 'high' | 'medium' | 'low' }[] = [];
+              const n = analysis.nutrition;
+              if (n.sugars !== null && n.sugars > 15) concerns.push({ icon: '🍬', label: tLang('concern.highSugar'), detail: `${n.sugars}g per serving`, level: 'high' });
+              else if (n.sugars !== null && n.sugars <= 5) concerns.push({ icon: '🍬', label: tLang('concern.lowSugar'), detail: `${n.sugars}g per serving`, level: 'low' });
+              if (n.sodium !== null && n.sodium > 400) concerns.push({ icon: '🧂', label: tLang('concern.highSodium'), detail: `${n.sodium}mg per serving`, level: 'high' });
+              if (n.saturatedFat !== null && n.saturatedFat > 5) concerns.push({ icon: '⚠️', label: tLang('concern.highSatFat'), detail: `${n.saturatedFat}g per serving`, level: 'medium' });
+              if (n.protein !== null && n.protein < 3) concerns.push({ icon: '💪', label: tLang('concern.lowProtein'), detail: `${n.protein}g per serving`, level: 'medium' });
+              if (n.fibre !== null && n.fibre < 2) concerns.push({ icon: '🌾', label: tLang('concern.lowFibre'), detail: `${n.fibre}g per serving`, level: 'low' });
+              if (n.calories !== null && n.calories > 300) concerns.push({ icon: '🔥', label: tLang('concern.highCalories'), detail: `${n.calories} kcal per serving`, level: 'medium' });
+              if (analysis.allergens.length > 0) concerns.push({ icon: '🚨', label: tLang('concern.allergens'), detail: analysis.allergens.join(', '), level: 'high' });
+              if (concerns.length === 0 && (n.calories !== null || n.protein !== null)) {
+                return (
+                  <div className="rounded-2xl border border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-6">
+                    <h2 className="text-sm font-bold uppercase tracking-widest text-green-700 dark:text-green-400 mb-3">🔍 {tLang('concern.radar')}</h2>
+                    <p className="text-sm text-green-700 dark:text-green-400">{tLang('concern.noConcerns')}</p>
+                  </div>
+                );
+              }
+              if (concerns.length === 0) return null;
+              return (
+                <div className="rounded-2xl border-2 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-6">
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-3">🔍 {tLang('concern.radar')}</h2>
+                  <div className="space-y-2">
+                    {concerns.map((c, i) => (
+                      <div key={i} className="flex items-start gap-3 rounded-lg bg-white/50 dark:bg-black/20 p-3">
+                        <span className="text-lg shrink-0">{c.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground">{c.label}</p>
+                          <p className="text-xs text-muted-foreground">{c.detail}</p>
+                        </div>
+                        <span className={`text-xs font-medium shrink-0 ${c.level === 'high' ? 'text-red-600' : c.level === 'medium' ? 'text-amber-600' : 'text-muted-foreground'}`}>{c.level === 'high' ? '⚠️' : c.level === 'medium' ? '🟡' : 'ℹ️'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ════════════════════════════════════════════
+                13. PACKAGE INTELLIGENCE
+                ════════════════════════════════════════════ */}
+            {(() => {
+              const pkg = (analysis as unknown as Record<string, unknown>).packaging as Record<string, unknown> | undefined;
+              if (!pkg) return null;
+              const items: { label: string; value: string | number | null }[] = [];
+              if (pkg.mrp) items.push({ label: 'MRP', value: `₹${pkg.mrp}` });
+              if (pkg.netQuantity) items.push({ label: tLang('pkg.netQty'), value: String(pkg.netQuantity) });
+              if (pkg.manufacturer) items.push({ label: tLang('pkg.manufacturer'), value: String(pkg.manufacturer) });
+              if (pkg.fssaiLicense) items.push({ label: 'FSSAI', value: String(pkg.fssaiLicense) });
+              if (pkg.batchNumber) items.push({ label: tLang('pkg.batch'), value: String(pkg.batchNumber) });
+              if (pkg.mfgDate) items.push({ label: tLang('pkg.mfgDate'), value: String(pkg.mfgDate) });
+              if (pkg.bestBefore) items.push({ label: tLang('pkg.bestBefore'), value: String(pkg.bestBefore) });
+              if (pkg.vegetarianMark) items.push({ label: tLang('pkg.vegMark'), value: pkg.vegetarianMark === 'veg' ? '🟢 Vegetarian' : '🔴 Non-Vegetarian' });
+              if (analysis.brand) items.push({ label: tLang('pkg.brand'), value: analysis.brand });
+              if (items.length === 0) return null;
+              return (
+                <div className="rounded-2xl border border-border/70 bg-card p-6">
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3">📦 {tLang('pkg.title')}</h2>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {items.map((item, i) => (
+                      <div key={i} className="rounded-lg bg-muted/50 px-3 py-2">
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase">{item.label}</p>
+                        <p className="text-sm font-semibold truncate" title={String(item.value)}>{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ════════════════════════════════════════════
+                14. VALUE ANALYSIS
+                ════════════════════════════════════════════ */}
+            {(() => {
+              const va = (analysis as unknown as Record<string, unknown>).valueAnalysis as Record<string, unknown> | undefined;
+              if (!va || !va.pricePer100g) return null;
+              return (
+                <div className="rounded-2xl border border-border/70 bg-card p-6">
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3">💰 {tLang('value.title')}</h2>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg bg-primary/5 border border-primary/10 px-3 py-2">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase">{tLang('value.per100g')}</p>
+                      <p className="text-lg font-bold">₹{`${va.pricePer100g}`}</p>
+                    </div>
+                    {!!va.pricePerServing && (
+                      <div className="rounded-lg bg-muted/50 px-3 py-2">
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase">{tLang('value.perServing')}</p>
+                        <p className="text-lg font-bold">₹{`${va.pricePerServing}`}</p>
+                      </div>
+                    )}
+                    {!!va.proteinPerRupee && (
+                      <div className="rounded-lg bg-muted/50 px-3 py-2">
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase">{tLang('value.proteinPer100')}</p>
+                        <p className="text-sm font-bold">{`${va.proteinPerRupee}`}g</p>
+                      </div>
+                    )}
+                  </div>
+                  {!!va.servingCostNote && <p className="mt-3 text-[11px] text-muted-foreground/70 italic">{`${va.servingCostNote}`}</p>}
+                </div>
+              );
+            })()}
+
+            {/* ════════════════════════════════════════════
+                15. DATE CHECK
+                ════════════════════════════════════════════ */}
+            {(() => {
+              const dc = (analysis as unknown as Record<string, unknown>).dateCheck as Record<string, unknown> | undefined;
+              if (!dc || dc.status === 'unreadable') return null;
+              const statusColor = dc.status === 'within_date' ? 'text-green-600' : dc.status === 'near_expiry' ? 'text-amber-600' : 'text-red-600';
+              const statusIcon = dc.status === 'within_date' ? '🟢' : dc.status === 'near_expiry' ? '🟡' : '🔴';
+              return (
+                <div className="rounded-2xl border border-border/70 bg-card p-6">
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3">📅 {tLang('date.title')}</h2>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{statusIcon}</span>
+                    <div>
+                      <p className={`text-sm font-semibold ${statusColor}`}>{String(dc.explanation)}</p>
+                      {!!dc.bestBefore && <p className="text-xs text-muted-foreground">{tLang('date.bestBefore')}: {String(dc.bestBefore)}</p>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ════════════════════════════════════════════
+                16. LABEL CONSISTENCY CHECK
+                ════════════════════════════════════════════ */}
+            {(() => {
+              const lt = (analysis as unknown as Record<string, unknown>).labelTrust as Record<string, unknown> | undefined;
+              if (!lt) return null;
+              const overallStatus = lt.overallStatus as string | undefined;
+              const statusColor = overallStatus === 'consistent' ? 'text-green-600' : overallStatus === 'needs_attention' ? 'text-amber-600' : 'text-muted-foreground';
+              const statusIcon = overallStatus === 'consistent' ? '✅' : overallStatus === 'needs_attention' ? '⚠️' : '❓';
+              const cv = lt.claimVerifications as Array<Record<string, unknown>> | undefined;
+              return (
+                <div className="rounded-2xl border border-border/70 bg-card p-6">
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3">🔎 {tLang('labelTrust.title')}</h2>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">{statusIcon}</span>
+                    <span className={`text-sm font-semibold ${statusColor}`}>{String(lt.summary)}</span>
+                  </div>
+                  {cv && cv.length > 0 && (
+                    <div className="space-y-2">
+                      {cv.map((item, i) => (
+                        <div key={i} className="rounded-lg bg-muted/30 p-3 text-xs">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span>{item.status === 'supported' ? '✅' : item.status === 'not_found' ? '⚠️' : '❓'}</span>
+                            <span className="font-medium">{String(item.claim)}</span>
+                          </div>
+                          <p className="text-muted-foreground">{String(item.explanation)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* ════════════════════════════════════════════
+                17. EVIDENCE (collapsible)
                 ════════════════════════════════════════════ */}
             <div className="rounded-2xl border border-border/70 bg-card overflow-hidden">
               <button className="w-full px-6 py-4 flex items-center justify-between text-sm font-bold uppercase tracking-widest text-muted-foreground hover:bg-muted/30 transition-colors" onClick={() => setShowDetailedEvidence(!showDetailedEvidence)}>

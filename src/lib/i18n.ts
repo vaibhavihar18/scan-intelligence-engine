@@ -220,6 +220,41 @@ const translations: Record<string, Record<Language, string>> = {
   "dashboard.claim": { en: "claim", mr: "दावा", hi: "दावा" },
   "dashboard.claims": { en: "claims", mr: "दावे", hi: "दावे" },
 
+  // === CONCERN RADAR ===
+  "concern.radar": { en: "CONCERN RADAR", mr: "चिंता रडार", hi: "चिंता रडार" },
+  "concern.highSugar": { en: "High sugar", mr: "जास्त साखर", hi: "अधिक चीनी" },
+  "concern.lowSugar": { en: "Low sugar", mr: "कमी साखर", hi: "कम चीनी" },
+  "concern.highSodium": { en: "High sodium", mr: "जास्त सोडियम", hi: "अधिक सोडियम" },
+  "concern.highSatFat": { en: "High saturated fat", mr: "जास्त संतृप्त चरबी", hi: "अधिक संतृप्त वसा" },
+  "concern.lowProtein": { en: "Low protein", mr: "कमी प्रथिन", hi: "कम प्रोटीन" },
+  "concern.lowFibre": { en: "Low fibre", mr: "कमी तंतू", hi: "कम फाइबर" },
+  "concern.highCalories": { en: "High calories", mr: "जास्त कॅलरी", hi: "अधिक कैलोरी" },
+  "concern.allergens": { en: "Declared allergens", mr: "घोषित अॅलर्जेन्स", hi: "घोषित एलर्जन" },
+  "concern.noConcerns": { en: "No major concerns detected from the scanned label.", mr: "स्कॅन केलेल्या लेबलवरून प्रमुख चिंता आढळल्या नाही.", hi: "स्कैन किए गए लेबल से कोई प्रमुख चिंता नहीं मिली।" },
+
+  // === PACKAGE INTELLIGENCE ===
+  "pkg.title": { en: "PACKAGE INTELLIGENCE", mr: "पॅकेज इंटेलिजन्स", hi: "पैकेज इंटेलिजेंस" },
+  "pkg.netQty": { en: "Net Quantity", mr: "एकूण प्रमाण", hi: "कुल मात्रा" },
+  "pkg.manufacturer": { en: "Manufacturer", mr: "उत्पादक", hi: "निर्माता" },
+  "pkg.batch": { en: "Batch No.", mr: "बॅच नं.", hi: "बैच नं." },
+  "pkg.mfgDate": { en: "Mfg Date", mr: "उत्पादन तारीख", hi: "निर्माण तिथि" },
+  "pkg.bestBefore": { en: "Best Before", mr: "सर्वोत्तम आधी", hi: "इससे पहले बेहतर" },
+  "pkg.vegMark": { en: "Veg/Non-Veg", mr: "शाक/अशाक", hi: "शाकाहारी/अशाकाहारी" },
+  "pkg.brand": { en: "Brand", mr: "ब्रॅंड", hi: "ब्रांड" },
+
+  // === VALUE ANALYSIS ===
+  "value.title": { en: "AHAR X VALUE", mr: "AHAR X किंमत", hi: "AHAR X कीमत" },
+  "value.per100g": { en: "Per 100g", mr: "प्रति १००g", hi: "प्रति १००g" },
+  "value.perServing": { en: "Per Serving", mr: "प्रति सेवन", hi: "प्रति सर्विंग" },
+  "value.proteinPer100": { en: "Protein per ₹100", mr: "प्रथिन प्रति ₹१००", hi: "प्रोटीन प्रति ₹१००" },
+
+  // === DATE CHECK ===
+  "date.title": { en: "DATE CHECK", mr: "तारीख तपासणी", hi: "तिथि जांच" },
+  "date.bestBefore": { en: "Best before", mr: "सर्वोत्तम आधी", hi: "इससे पहले बेहतर" },
+
+  // === LABEL TRUST ===
+  "labelTrust.title": { en: "LABEL CONSISTENCY CHECK", mr: "लेबल सुसंगतता तपासणी", hi: "लेबल संगतता जांच" },
+
   // === VERDICT SECTION ===
   "verdict.yourResult": { en: "YOUR RESULT", mr: "तुमचा निष्कर्ष", hi: "आपका परिणाम" },
   "verdict.goodChoice": { en: "GOOD CHOICE", mr: "चांगला पर्याय", hi: "अच्छा विकल्प" },
