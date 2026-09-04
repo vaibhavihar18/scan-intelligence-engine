@@ -219,6 +219,62 @@ const translations: Record<string, Record<Language, string>> = {
   "dashboard.allergens": { en: "allergens", mr: "अॅलर्जेन्स", hi: "एलर्जन" },
   "dashboard.claim": { en: "claim", mr: "दावा", hi: "दावा" },
   "dashboard.claims": { en: "claims", mr: "दावे", hi: "दावे" },
+
+  // === VERDICT SECTION ===
+  "verdict.yourResult": { en: "YOUR RESULT", mr: "तुमचा निष्कर्ष", hi: "आपका परिणाम" },
+  "verdict.goodChoice": { en: "GOOD CHOICE", mr: "चांगला पर्याय", hi: "अच्छा विकल्प" },
+  "verdict.occasional": { en: "OCCASIONAL / LIMITED", mr: "प्रकरणीय / मर्यादित", hi: "कभी-कभी / सीमित" },
+  "verdict.notGoodChoice": { en: "NOT A GOOD CHOICE", mr: "चांगला पर्याय नाही", hi: "अच्छा विकल्प नहीं" },
+  "verdict.insufficient": { en: "INSUFFICIENT LABEL EVIDENCE", mr: "अपुरा लेबल पुरावा", hi: "अपर्याप्त लेबल सबूत" },
+  "verdict.oneLineVerdict": { en: "One-line verdict", mr: "एक-ओळ निष्कर्ष", hi: "एक-पंक्ति निष्कर्ष" },
+
+  // Key findings
+  "findings.title": { en: "KEY FINDINGS", mr: "प्रमुख शोध", hi: "मुख्य निष्कर्ष" },
+  "findings.frontClaim": { en: "Front claims", mr: "समोरचे दावे", hi: "सामने के दावे" },
+  "findings.backIngredients": { en: "Back ingredients", mr: "मागील घटक", hi: "पीछे की सामग्री" },
+  "findings.verified": { en: "Verified ingredients", mr: "पडताळलेले घटक", hi: "सत्यापित सामग्री" },
+  "findings.inconsistencies": { en: "Inconsistencies found", mr: "विसंगती आढळल्या", hi: "असंगति मिली" },
+  "findings.noHighlights": { en: "No prominent front claims detected", mr: "प्रमुख समोरचे दावे आढळले नाही", hi: "कोई प्रमुख सामने का दावा नहीं मिला" },
+
+  // Suitability grid
+  "suitability.gridTitle": { en: "WHO IS THIS PRODUCT SUITABLE FOR?", mr: "हे उत्पादन कोणासाठी योग्य आहे?", hi: "यह उत्पादन किसके लिए उपयुक्त है?" },
+  "suitability.child": { en: "Child", mr: "बालक", hi: "बच्चा" },
+  "suitability.adult": { en: "Adult", mr: "प्रौढ", hi: "वयस्क" },
+  "suitability.fitness": { en: "Fitness", mr: "फिटनेस", hi: "फिटनेस" },
+  "suitability.weight": { en: "Weight-Conscious", mr: "वजन-जागरूक", hi: "वज़न-सचेत" },
+  "suitability.veg": { en: "Vegetarian", mr: "शाकाहारी", hi: "शाकाहारी" },
+  "suitability.highProtein": { en: "High-Protein", mr: "उच्च-प्रथिन", hi: "उच्च-प्रोटीन" },
+
+  // Goal impact
+  "goal.title": { en: "EFFECT ON YOUR GOAL", mr: "तुमच्या ध्येयावर परिणाम", hi: "आपके लक्ष्य पर प्रभाव" },
+  "goal.child": { en: "For your child", mr: "तुमच्या बालकासाठी", hi: "आपके बच्चे के लिए" },
+  "goal.fitness": { en: "For fitness goals", mr: "फिटनेस ध्येयांसाठी", hi: "फिटनेस लक्ष्यों के लिए" },
+  "goal.weight": { en: "For weight management", mr: "वजन व्यवस्थापनासाठी", hi: "वजन प्रबंधन के लिए" },
+  "goal.highProtein": { en: "For high-protein diet", mr: "उच्च-प्रथिन आहारासाठी", hi: "उच्च-प्रोटीन आहार के लिए" },
+  "goal.general": { en: "For general health", mr: "सामान्य आरोग्यासाठी", hi: "सामान्य स्वास्थ्य के लिए" },
+
+  // Simple explanation header
+  "simpleWords.title": { en: "IN SIMPLE WORDS", mr: "सोप्या शब्दात", hi: "सरल शब्दों में" },
+
+  // Allergen alert (simplified)
+  "allergen.alert": { en: "ALLERGEN ALERT", mr: "अॅलर्जन सूचना", hi: "एलर्जन चेतावनी" },
+  "allergen.contains": { en: "Contains", mr: "समाविष्ट", hi: "शामिल" },
+  "allergen.mayContain": { en: "May contain", mr: "असू शकते", hi: "हो सकते हैं" },
+  "allergen.warningText": { en: "Do not consume if you have an allergy to these ingredients.", mr: "या घटकांना अॅलर्जी असल्यास खाऊ नका.", hi: "इन सामग्री से एलर्जी हो तो इन्हें न खाएं।" },
+
+  // Evidence section
+  "evidence.title": { en: "DETAILED EVIDENCE", mr: "सविस्तर पुरावा", hi: "विस्तृत सबूत" },
+  "evidence.front": { en: "FRONT", mr: "समोर", hi: "सामने" },
+  "evidence.back": { en: "BACK", mr: "माग", hi: "पीछे" },
+  "evidence.source": { en: "Source", mr: "स्रोत", hi: "स्रोत" },
+  "evidence.text": { en: "Text", mr: "मजकूर", hi: "पाठ" },
+
+  // Additional status labels
+  "status.matched": { en: "MATCHED", mr: "जुळलेला", hi: "मिलान हुआ" },
+  "status.frontClaimNotVerified": { en: "NOT CONFIRMED", mr: "पुष्ट नाही", hi: "पुष्टि नहीं हुई" },
+  "status.frontClaimVerified": { en: "CONFIRMED", mr: "पुष्ट", hi: "पुष्ट" },
+  "status.backReadable": { en: "Back label readable", mr: "मागील लेबल वाचता आला", hi: "पीछे का लेबल पठनीय" },
+  "status.backNotReadable": { en: "Back label not fully readable", mr: "मागील लेबल पूर्णपणे वाचता आला नाही", hi: "पीछे का लेबल पूरी तरह पठनीय नहीं" },
 };
 
 export function t(key: string, lang: Language = "en"): string {

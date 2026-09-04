@@ -297,40 +297,48 @@ export const runFullScan = action({
         );
       }
 
-      // 11. Build simple explanation
+      // 11. Build simple human-readable explanation
+      const productName = front.productName ?? "This product";
       const explanationParts: string[] = [];
-      explanationParts.push(`Product: ${front.productName ?? "Product name not readable"}`);
 
-      if (nutrition.calories !== null) {
-        explanationParts.push(`Calories: ${nutrition.calories} kcal per serving`);
-      }
-      if (nutrition.protein !== null) {
-        explanationParts.push(`Protein: ${nutrition.protein}g`);
-      }
-      if (nutrition.sugars !== null) {
-        explanationParts.push(`Sugars: ${nutrition.sugars}g`);
-      }
+      // Sentence 1: What is this product?
+      explanationParts.push(`${productName} is a food product that ${front.claims.length > 0 ? `makes claims like ${front.claims.slice(0, 2).join(" and ")}` : "does not prominently highlight specific claims on the front"}.`);
 
-      if (front.claims.length > 0) {
-        explanationParts.push(`Front claims: ${front.claims.join(", ")}`);
-      }
-
+      // Sentence 2: Front vs Back verification
       if (ingredientVerifications.length > 0) {
         const confirmed = ingredientVerifications.filter((v) => v.status === "match_confirmed");
         const inconsistent = ingredientVerifications.filter((v) => v.status === "potential_inconsistency");
-        if (confirmed.length > 0) {
-          explanationParts.push(`Verified ingredients: ${confirmed.map((v) => v.ingredient).join(", ")}`);
-        }
-        if (inconsistent.length > 0) {
-          explanationParts.push(`Potential inconsistencies: ${inconsistent.map((v) => v.ingredient).join(", ")}`);
+        const notStated = ingredientVerifications.filter((v) => v.status === "percentage_not_stated");
+        if (confirmed.length > 0 && inconsistent.length === 0) {
+          explanationParts.push(`The front-highlighted ingredients (${confirmed.map((v) => v.ingredient).join(", ")}) ${confirmed.length === 1 ? "is" : "are"} confirmed in the declared back ingredient list.`);
+        } else if (inconsistent.length > 0) {
+          const incList = inconsistent.map((v) => v.ingredient).join(", ");
+          explanationParts.push(`${incList} ${inconsistent.length === 1 ? "is" : "are"} highlighted on the front but ${inconsistent.length === 1 ? "was" : "were"} not found in the readable declared ingredient list — potential front-back inconsistency.`);
+        } else if (notStated.length > 0) {
+          explanationParts.push(`${notStated.map((v) => v.ingredient).join(", ")} ${notStated.length === 1 ? "was" : "were"} found in the ingredient list but the declared percentage could not be read from the label.`);
         }
       }
 
+      // Sentence 3: Key nutrition highlights
+      const nutritionHighlights: string[] = [];
+      if (nutrition.sugars !== null && nutrition.sugars > 15) nutritionHighlights.push(`high sugar (${nutrition.sugars}g)`);
+      else if (nutrition.sugars !== null && nutrition.sugars <= 5) nutritionHighlights.push(`low sugar (${nutrition.sugars}g)`);
+      if (nutrition.calories !== null && nutrition.calories > 300) nutritionHighlights.push(`high calories (${nutrition.calories} kcal)`);
+      if (nutrition.protein !== null && nutrition.protein >= 10) nutritionHighlights.push(`good protein (${nutrition.protein}g)`);
+      if (nutrition.protein !== null && nutrition.protein < 3) nutritionHighlights.push(`low protein (${nutrition.protein}g)`);
+      if (nutrition.sodium !== null && nutrition.sodium > 400) nutritionHighlights.push(`high sodium (${nutrition.sodium}mg)`);
+      if (nutritionHighlights.length > 0) {
+        explanationParts.push(`Key nutrition: ${nutritionHighlights.join(", ")}.`);
+      } else if (nutrition.calories !== null) {
+        explanationParts.push(`Nutrition per serving: ${nutrition.calories} kcal, ${nutrition.protein ?? "?"}g protein, ${nutrition.sugars ?? "?"}g sugar.`);
+      }
+
+      // Sentence 4: Allergen warning
       if (allAllergens.length > 0) {
-        explanationParts.push(`Allergens: ${allAllergens.join(", ")}`);
+        explanationParts.push(`Contains allergens: ${allAllergens.join(", ")}.`);
       }
 
-      const simpleExplanation = explanationParts.join(". ");
+      const simpleExplanation = explanationParts.join(" ");
 
       // 12. Build full analysis object
       const analysis: Record<string, unknown> = {
