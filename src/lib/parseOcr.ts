@@ -277,10 +277,12 @@ function extractIngredientList(text: string): string {
 }
 
 function splitIngredients(list: string): string[] {
-  // Split by commas, semicolons, periods, pipes, line breaks
+  // Split by commas, semicolons, pipes, line breaks — NOT periods
+  // (periods often appear within ingredient text, e.g. "Vit. A")
+  // But DO split on periods followed by a space+uppercase (sentence boundary)
   const parts = list
-    .split(/[,;.\n|]+/)
-    .map((s) => s.trim())
+    .split(/[,;|\n]+|(?:\.\s+(?=[A-Z]))/)
+    .map((s) => s.replace(/\.\s*$/, "").trim()) // strip trailing periods
     .filter((s) => s.length > 1 && s.length < 100);
   return parts;
 }

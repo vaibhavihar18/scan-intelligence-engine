@@ -247,7 +247,33 @@ export function verifyIngredients(
       };
     }
 
-    const declaredPercentage = backPercentages[match] ?? backPercentages[normalizedFront] ?? null;
+    // Find declared percentage by trying multiple normalized forms
+    const matchLower = match.toLowerCase().trim();
+    const matchRoot = matchLower.replace(/s$/, "");
+    const normFrontRoot = normFront;
+    let declaredPercentage: string | null = null;
+    // Try direct lookups first
+    declaredPercentage =
+      backPercentages[match] ??
+      backPercentages[matchLower] ??
+      backPercentages[normalizedFront] ??
+      backPercentages[normFrontRoot] ??
+      null;
+    // If not found, search all keys for a substring match
+    if (!declaredPercentage) {
+      for (const [key, val] of Object.entries(backPercentages)) {
+        const keyLower = key.toLowerCase().trim();
+        if (
+          keyLower.includes(matchLower) ||
+          matchLower.includes(keyLower) ||
+          keyLower.includes(normFrontRoot) ||
+          normFrontRoot.includes(keyLower)
+        ) {
+          declaredPercentage = val;
+          break;
+        }
+      }
+    }
 
     if (declaredPercentage) {
       return {
