@@ -9,6 +9,7 @@ import type {
   ScoreFactor,
   ProfileCategory,
   NutritionData,
+  Confidence,
 } from "../types/ahar";
 
 // --- Profile-based AHAR X Score Calculation (5-point scale) ---
@@ -663,3 +664,138 @@ export function evaluateFSSAIRules(
 
   return evaluations;
 }
+
+// --- Value Analysis (MRP / Price per 100g / per serving) ---
+
+export function calculateValueAnalysis(
+  mrp: number | null,
+  netQuantityGrams: number | null,
+  netQuantity: string | null,
+  servingSizeGrams: number | null,
+  nutrition: NutritionData,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {
+    mrp,
+    currency: "INR",
+    netQuantity,
+    netQuantityGrams,
+    pricePer100g: null as number | null,
+    pricePer100ml: null as number | null,
+    pricePerServing: null as number | null,
+    caloriesPerRupee: null as number | null,
+    proteinPerRupee: null as number | null,
+    fibrePerRupee: null as number | null,
+    servingCostNote: null as string | null,
+  };
+
+  if (mrp === null || netQuantityGrams === null || netQuantityGrams <= 0) {
+    result.servingCostNote = "Could not calculate value — MRP or quantity not readable from label.";
+    return result;
+  }
+
+  // Price per 100g
+  result.pricePer100g = Math.round((mrp / netQuantityGrams) * 100 * 100) / 100;
+
+  // Price per serving
+  if (servingSizeGrams && servingSizeGrams > 0) {
+    result.pricePerServing = Math.round((mrp / netQuantityGrams) * servingSizeGrams * 100) / 100;
+  }
+
+  // Nutrition value per rupee
+  if (nutrition.calories !== null && nutrition.calories > 0) {
+    result.caloriesPerRupee = Math.round((nutrition.calories / mrp) * 100) / 100;
+  }
+  if (nutrition.protein !== null && nutrition.protein > 0) {
+    result.proteinPerRupee = Math.round((nutrition.protein / mrp) * 100) / 100;
+  }
+  if (nutrition.fibre !== null && nutrition.fibre > 0) {
+    result.fibrePerRupee = Math.round((nutrition.fibre / mrp) * 100) / 100;
+  }
+
+  result.servingCostNote = `Calculated from package MRP (₹${mrp}) and declared quantity (${netQuantityGrams}g).`;
+  return result;
+}
+
+// --- Label Trust Check ---
+
+export function buildLabelTrustCheck(
+  frontClaims: string[],
+  ingredientVerifications: IngredientVerification[],
+  nutrition: NutritionData,
+  allergens: string[],
+  vegetarianDecl: string | null,
+  frontConfidence: string,
+  backConfidence: string,
+): Record<string, unknown> {
+  const claimVerifications = frontClaims.map((claim) => {
+    // Check if any ingredient verification relates to this claim
+    const relatedVerification = ingredientVerifications.find(
+      (v) => v.ingredient.toLowerCase().includes(claim.toLowerCase()) ||
+        claim.toLowerCase().includes(v.ingredient.toLowerCase())
+    );
+
+    if (relatedVerification) {
+      return {
+        claim,
+        frontEvidence: claim,
+        backEvidence: relatedVerification.backFound
+          ? `Found in declared ingredients${relatedVerification.declaredPercentage ? ` (${relatedVerification.declaredPercentage})` : ""}`
+          : "Not found in readable declared ingredients",
+        status: relatedVerification.status === "match_confirmed"
+          ? "supported" as const
+          : relatedVerification.status === "percentage_not_stated"
+            ? "supported" as const
+            : relatedVerification.status === "potential_inconsistency"
+              ? "not_found" as const
+              : "insufficient_evidence" as const,
+        confidence: relatedVerification.confidence,
+        explanation: relatedVerification.status === "match_confirmed"
+          ? `"${claim}" is confirmed in the declared ingredient list.`
+          : relatedVerification.status === "percentage_not_stated"
+            ? `"${claim}" found but declared percentage could not be read.`
+            : relatedVerification.status === "potential_inconsistency"
+              ? `"${claim}" is highlighted on front but not found in readable declared ingredients.`
+              : `Could not verify "${claim}" — insufficient label evidence.`,
+      };
+    }
+
+    // Claim without specific ingredient verification
+    return {
+      claim,
+      frontEvidence: claim,
+      backEvidence: "No specific ingredient match found",
+      status: "insufficient_evidence" as const,
+      confidence: frontConfidence as Confidence,
+      explanation: `"${claim}" detected on front — back label evidence insufficient for verification.`,
+    };
+  });
+
+  // Overall consistency
+  const hasInconsistencies = ingredientVerifications.some(v => v.status === "potential_inconsistency");
+  const allConfirmed = ingredientVerifications.length > 0 && ingredientVerifications.every(
+    v => v.status === "match_confirmed" || v.status === "percentage_not_stated"
+  );
+
+  const overallStatus = hasInconsistencies
+    ? "needs_attention" as const
+    : allConfirmed
+      ? "consistent" as const
+      : "insufficient_evidence" as const;
+
+  const summary = overallStatus === "consistent"
+    ? "Front claims are consistent with declared back label information."
+    : overallStatus === "needs_attention"
+      ? "Potential claim-label inconsistencies detected. Review recommended."
+      : "Insufficient evidence to fully evaluate label consistency.";
+
+  return {
+    overallStatus,
+    claimVerifications,
+    ingredientConsistency: hasInconsistencies ? "inconsistent" : allConfirmed ? "consistent" : "unclear",
+    nutritionDeclared: nutrition.calories !== null,
+    allergenDeclared: allergens.length > 0,
+    vegetarianDeclared: vegetarianDecl !== null,
+    summary,
+  };
+}
+

@@ -62,6 +62,73 @@ export interface NutritionData {
   sodium: number | null;
 }
 
+// --- Packaging intelligence ---
+
+export interface PackagingInfo {
+  brand: string | null;
+  variant: string | null;
+  mrp: number | null;
+  mrpCurrency: string;
+  netQuantity: string | null;
+  netQuantityGrams: number | null;
+  servingSizeGrams: number | null;
+  servingsPerPack: number | null;
+  mfgDate: string | null;
+  bestBefore: string | null;
+  expiryDate: string | null;
+  batchNumber: string | null;
+  fssaiLicense: string | null;
+  manufacturer: string | null;
+  countryOfOrigin: string | null;
+  vegetarianMark: "veg" | "non_veg" | null;
+  warnings: string[];
+  customerCare: string | null;
+}
+
+// --- Value analysis ---
+
+export interface ValueAnalysis {
+  mrp: number | null;
+  currency: string;
+  netQuantity: string | null;
+  netQuantityGrams: number | null;
+  pricePer100g: number | null;
+  pricePer100ml: number | null;
+  pricePerServing: number | null;
+  caloriesPerRupee: number | null;
+  proteinPerRupee: number | null;
+  fibrePerRupee: number | null;
+  servingCostNote: string | null;
+}
+
+// --- Label trust check ---
+
+export interface LabelTrustCheck {
+  overallStatus: "consistent" | "needs_attention" | "insufficient_evidence";
+  claimVerifications: {
+    claim: string;
+    frontEvidence: string;
+    backEvidence: string;
+    status: "supported" | "not_verified" | "not_found" | "insufficient_evidence";
+    confidence: Confidence;
+    explanation: string;
+  }[];
+  ingredientConsistency: "consistent" | "inconsistent" | "unclear";
+  nutritionDeclared: boolean;
+  allergenDeclared: boolean;
+  vegetarianDeclared: boolean;
+  summary: string;
+}
+
+// --- Date check ---
+
+export interface DateCheck {
+  bestBefore: string | null;
+  expiryDate: string | null;
+  status: "within_date" | "near_expiry" | "past_expiry" | "unreadable";
+  explanation: string;
+}
+
 // --- FSSAI rule evaluation result ---
 
 export interface FSSAIEvaluation {
@@ -87,7 +154,7 @@ export interface SuitabilityAssessment {
   reasons: string[];
 }
 
-// --- AHAR X Score (5-point scale) ---
+// --- AHAR X Score (0-10 scale) ---
 
 export interface AharScore {
   overall: number; // 0-10, one decimal
@@ -105,6 +172,7 @@ export interface ScoreFactor {
 
 export interface ScanAnalysis {
   productName: string | null;
+  brand: string | null;
   frontClaims: string[];
   frontHighlightedIngredients: string[];
   backIngredients: string[];
@@ -114,12 +182,45 @@ export interface ScanAnalysis {
   footnotes: string[];
   vegetarianDeclaration: string | null;
   nutrition: NutritionData;
+  packaging: PackagingInfo;
+  valueAnalysis: ValueAnalysis;
+  labelTrust: LabelTrustCheck;
+  dateCheck: DateCheck;
   ingredientVerifications: IngredientVerification[];
   fssaiEvaluations: FSSAIEvaluation[];
   suitability: SuitabilityAssessment[];
   aharScore: AharScore;
   simpleExplanation: string;
   limitations: string[];
+  analysisSource: "ai_vision" | "client_ocr";
+}
+
+// --- Comparison result ---
+
+export interface ComparisonResult {
+  productA: {
+    scanSessionId: string;
+    productName: string | null;
+    nutrition: NutritionData;
+    valueAnalysis: ValueAnalysis;
+    aharScore: AharScore;
+    suitability: SuitabilityAssessment[];
+    allergens: string[];
+    ingredientVerifications: IngredientVerification[];
+  };
+  productB: {
+    scanSessionId: string;
+    productName: string | null;
+    nutrition: NutritionData;
+    valueAnalysis: ValueAnalysis;
+    aharScore: AharScore;
+    suitability: SuitabilityAssessment[];
+    allergens: string[];
+    ingredientVerifications: IngredientVerification[];
+  };
+  winner: "A" | "B" | "tie";
+  reasons: string[];
+  profileUsed: ProfileCategory;
 }
 
 // --- User profile for personalized scoring ---
