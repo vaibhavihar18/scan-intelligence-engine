@@ -103,7 +103,7 @@ const translations: Record<string, Record<Language, string>> = {
   "profile.suitable": { en: "Label-based suitability: Generally suitable", mr: "लेबल-आधारित योग्यता: सामान्यतः योग्य", hi: "लेबल-आधारित उपयुक्तता: सामान्यतः उपयुक्त" },
   "profile.useCaution": { en: "Label-based suitability: Use caution", mr: "लेबल-आधारित योग्यता: सावधान वापरा", hi: "लेबल-आधारित उपयुक्तता: सावधानी बरतें" },
   "profile.notRecommended": { en: "Label-based suitability: Not recommended for this profile", mr: "लेबल-आधारित योग्यता: या प्रोफाइलसाठी शिफारस नाही", hi: "लेबल-आधारित उपयुक्तता: इस प्रोफ़ाइल के लिए अनुशंसित नहीं" },
-  "profile.insufficient": { en: "Insufficient label information for a confident suitability assessment.", mr: "आत्मविश्वासास्पद योग्यता मूल्यांकनासाठी अपुरी लेबल माहिती.", hi: "एक आत्मविश्वासपूर्ण उपयुक्तता मूल्यांकन के लिए अपर्याप्त लेबल जानकारी।" },
+  "profile.insufficient": { en: "Not verified from the uploaded label.", mr: "अपलोड केलेल्या लेबलवरून पडताळले नाही.", hi: "अपलोड किए गए लेबल से सत्यापित नहीं।" },
 
   // Section 7: Personalized analysis
   "section.personalized": { en: "7. PERSONALIZED ANALYSIS", mr: "७. वैयक्तिकृत विश्लेषण", hi: "७. व्यक्तिगत विश्लेषण" },
@@ -141,8 +141,8 @@ const translations: Record<string, Record<Language, string>> = {
   "status.confirmed": { en: "CONFIRMED", mr: "पुष्ट", hi: "पुष्ट" },
   "status.potentialInconsistency": { en: "POTENTIAL INCONSISTENCY", mr: "संभाव्य विसंगती", hi: "संभावित असंगति" },
   "status.percentNotDeclared": { en: "INGREDIENT FOUND — PERCENTAGE NOT DECLARED", mr: "घटक सापडला — टक्केवारी घोषित नाही", hi: "सामग्री मिली — प्रतिशत घोषित नहीं" },
-  "status.insufficientEvidence": { en: "INSUFFICIENT EVIDENCE", mr: "अपुरा पुरावा", hi: "अपर्याप्त सबूत" },
-  "status.notReadable": { en: "NOT READABLE", mr: "वाचता आला नाही", hi: "पठनीय नहीं" },
+  "status.insufficientEvidence": { en: "NOT VERIFIED FROM LABEL", mr: "लेबलवरून पडताळले नाही", hi: "लेबल से सत्यापित नहीं" },
+  "status.notReadable": { en: "NOT VERIFIED FROM LABEL", mr: "लेबलवरून पडताळले नाही", hi: "लेबल से सत्यापित नहीं" },
   "status.notDeclared": { en: "NOT DECLARED", mr: "घोषित नाही", hi: "घोषित नहीं" },
 
   // Verification table headers
@@ -254,6 +254,32 @@ const translations: Record<string, Record<Language, string>> = {
 
   // === LABEL TRUST ===
   "labelTrust.title": { en: "LABEL CONSISTENCY CHECK", mr: "लेबल सुसंगतता तपासणी", hi: "लेबल संगतता जांच" },
+
+  // === DECISION WORDING ===
+  "decision.suitable": { en: "SUITABLE", mr: "योग्य", hi: "उपयुक्त" },
+  "decision.occasional": { en: "OCCASIONAL", mr: "प्रकरणीय", hi: "कभी-कभी" },
+  "decision.notIdeal": { en: "NOT IDEAL", mr: "योग्य नाही", hi: "उपयुक्त नहीं" },
+  "decision.notRecommended": { en: "NOT RECOMMENDED", mr: "शिफारस नाही", hi: "अनुशंसित नहीं" },
+  "decision.suitableRegular": { en: "SUITABLE AS A REGULAR CHOICE", mr: "नियमित पर्याय म्हणून योग्य", hi: "नियमित विकल्प के रूप में उपयुक्त" },
+  "decision.notVerified": { en: "NOT VERIFIED FROM LABEL", mr: "लेबलवरून पडताळले नाही", hi: "लेबल से सत्यापित नहीं" },
+
+  // === WHAT SHOULD I DO ===
+  "action.title": { en: "WHAT SHOULD YOU DO?", mr: "तुम्हाला काय करावे लागेल?", hi: "आपको क्या करना चाहिए?" },
+
+  // === KEY FINDINGS ===
+  "findings.simple": { en: "KEY FINDINGS", mr: "प्रमुख शोध", hi: "मुख्य निष्कर्ष" },
+
+  // === PRODUCT AT A GLANCE ===
+  "glance.title": { en: "PRODUCT AT A GLANCE", mr: "उत्पादन एका नजरेत", hi: "उत्पादन पर एक नज़र" },
+
+  // === COMPARISON ===
+  "compare.title": { en: "COMPARE PRODUCTS", mr: "उत्पादने तुलना करा", hi: "उत्पादनों की तुलना करें" },
+  "compare.better": { en: "BETTER CHOICE", mr: "चांगला पर्याय", hi: "बेहतर विकल्प" },
+  "compare.why": { en: "Why?", mr: "का?", hi: "क्यों?" },
+  "compare.addSecond": { en: "Add Another Product to Compare", mr: "तुलनेसाठी दुसरे उत्पादन जोडा", hi: "तुलना के लिए एक और उत्पादन जोड़ें" },
+  "compare.lower": { en: "Lower", mr: "कमी", hi: "कम" },
+  "compare.higher": { en: "Higher", mr: "जास्त", hi: "अधिक" },
+  "compare.betterValue": { en: "Better value", mr: "चांगी किंमत", hi: "बेहतर कीमत" },
 
   // === VERDICT SECTION ===
   "verdict.yourResult": { en: "YOUR RESULT", mr: "तुमचा निष्कर्ष", hi: "आपका परिणाम" },

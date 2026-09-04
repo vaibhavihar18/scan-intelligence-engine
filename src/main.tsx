@@ -15,6 +15,7 @@ const AuthPage = lazy(() => import("./pages/Auth.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const Scan = lazy(() => import("./pages/Scan.tsx"));
 const Profile = lazy(() => import("./pages/Profile.tsx"));
+const Compare = lazy(() => import("./pages/Compare.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Simple loading fallback for route transitions
@@ -144,6 +145,14 @@ createRoot(document.getElementById("root")!).render(
                 element={
                   <RequireAuth>
                     <Profile />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/compare"
+                element={
+                  <RequireAuth>
+                    <Compare />
                   </RequireAuth>
                 }
               />

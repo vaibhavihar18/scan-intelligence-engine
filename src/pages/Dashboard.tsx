@@ -136,13 +136,24 @@ export default function Dashboard() {
               {t("dashboard.subtitle", language)}
             </p>
           </div>
-          <Button
-            onClick={() => navigate("/scan")}
-            className="gap-2 ahar-gradient text-white hover:opacity-90"
-          >
-            <Camera className="size-4" />
-            {t("nav.scan", language)}
-          </Button>
+          <div className="flex items-center gap-2">
+            {scans && scans.length >= 2 && (
+              <Button
+                variant="outline"
+                onClick={() => navigate("/compare")}
+                className="gap-2"
+              >
+                {t("compare.title", language)}
+              </Button>
+            )}
+            <Button
+              onClick={() => navigate("/scan")}
+              className="gap-2 ahar-gradient text-white hover:opacity-90"
+            >
+              <Camera className="size-4" />
+              {t("nav.scan", language)}
+            </Button>
+          </div>
         </motion.div>
 
         {/* Scan list */}
